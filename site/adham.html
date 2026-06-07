@@ -1,0 +1,2643 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>ADHAM SYSTEM · XAUUSD</title>
+<link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Orbitron:wght@400;700;900&family=Rajdhani:wght@400;600;700&display=swap" rel="stylesheet">
+<style>
+:root{--gold:#FFD700;--gold2:#FFA500;--green:#00FF88;--red:#FF2244;--blue:#00E5FF;--purple:#BB86FC;--orange:#FF6D00;--bg:#040810;--bg2:#0A1020;--bg3:#0F1830;--panel:#0D1525;--border:#1A2A40;--text:#C8D8E8;--dim:#4A6080}
+*{margin:0;padding:0;box-sizing:border-box}
+html,body{height:100%;background:var(--bg);color:var(--text);font-family:'Rajdhani',sans-serif;overflow:hidden}
+body::before{content:'';position:fixed;inset:0;background-image:linear-gradient(rgba(0,229,255,.02)1px,transparent 1px),linear-gradient(90deg,rgba(0,229,255,.02)1px,transparent 1px);background-size:44px 44px;pointer-events:none;z-index:0}
+.root{position:relative;z-index:1;display:flex;flex-direction:column;height:100vh;padding:5px;gap:4px;overflow:hidden}
+
+/* ─ HEADER ─ */
+.hdr{display:flex;align-items:center;justify-content:space-between;padding:6px 14px;background:linear-gradient(135deg,#071220,#0C1C38);border:1px solid var(--gold);border-radius:4px;flex-shrink:0;position:relative;overflow:hidden}
+.hdr::after{content:'';position:absolute;top:0;left:0;right:0;height:2px;background:linear-gradient(90deg,transparent,var(--gold),var(--gold2),transparent);animation:scan 3s linear infinite}
+@keyframes scan{0%{transform:translateX(-100%)}100%{transform:translateX(100%)}}
+.logo{font-family:'Orbitron',sans-serif;font-size:15px;font-weight:900;color:var(--gold);letter-spacing:3px;text-shadow:0 0 15px rgba(255,215,0,.4)}
+.logo sub{display:block;font-size:8px;color:var(--blue);letter-spacing:4px;font-weight:400;margin-top:1px}
+.hdr-mid{text-align:center}
+#pbig{font-family:'Share Tech Mono',monospace;font-size:30px;font-weight:700;color:var(--gold);text-shadow:0 0 20px rgba(255,215,0,.5);letter-spacing:2px;transition:color .3s}
+#pbig.up{color:var(--green)} #pbig.dn{color:var(--red)}
+#pchg{font-family:'Share Tech Mono',monospace;font-size:11px;letter-spacing:1px}
+.hdr-right{display:flex;flex-direction:column;align-items:flex-end;gap:4px}
+.hdr-row{display:flex;gap:7px;align-items:center}
+#clk{font-family:'Share Tech Mono',monospace;font-size:11px;color:var(--blue)}
+.dot{width:6px;height:6px;border-radius:50%;animation:pulse 1.5s ease-in-out infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}
+.bdg{font-family:'Orbitron',sans-serif;font-size:7px;font-weight:700;padding:2px 7px;border-radius:2px;letter-spacing:2px;border:1px solid}
+.bl{background:rgba(0,255,136,.1);border-color:var(--green);color:var(--green)}
+.bc{background:rgba(74,96,128,.15);border-color:var(--dim);color:var(--dim)}
+.bf{background:rgba(255,215,0,.1);border-color:var(--gold);color:var(--gold)}
+.be{background:rgba(255,34,68,.1);border-color:var(--red);color:var(--red)}
+.btn{font-family:'Rajdhani',sans-serif;font-size:10px;font-weight:700;letter-spacing:1px;padding:3px 9px;border-radius:2px;cursor:pointer;border:1px solid;background:transparent;text-transform:uppercase;transition:all .2s}
+.btn:hover{opacity:.8}
+.bg{border-color:var(--gold);color:var(--gold)}
+.bo{border-color:var(--orange);color:var(--orange)}
+.bb{border-color:var(--blue);color:var(--blue)}
+
+/* ─ ASTRO BAR ─ */
+.astro-bar{display:flex;gap:5px;flex-wrap:wrap;align-items:center;background:rgba(255,215,0,.03);border:1px solid rgba(255,215,0,.15);border-radius:3px;padding:4px 10px;flex-shrink:0}
+.ab-lbl{font-size:7px;letter-spacing:2px;color:var(--gold);font-weight:700}
+.abt{display:flex;align-items:center;gap:4px;background:var(--bg2);border:1px solid var(--border);border-radius:3px;padding:2px 7px}
+.abt.auto{border-color:rgba(0,255,136,.25);background:rgba(0,255,136,.03)}
+.abt.warn{border-color:rgba(255,109,0,.4);background:rgba(255,109,0,.05)}
+.abt.alert{border-color:rgba(255,34,68,.4);background:rgba(255,34,68,.05);animation:blink .8s ease-in-out infinite}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:.6}}
+.abtl{font-size:6px;letter-spacing:1px;color:var(--dim)}
+.abtv{font-size:11px;font-weight:700;font-family:'Rajdhani',sans-serif}
+
+/* ─ TRANSIT TICKER ─ */
+.transit-bar{display:flex;gap:4px;flex-shrink:0;overflow-x:auto;padding-bottom:2px}
+.transit-bar::-webkit-scrollbar{height:2px}
+.transit-bar::-webkit-scrollbar-thumb{background:var(--border)}
+.tt{display:flex;align-items:center;gap:5px;background:var(--panel);border:1px solid var(--border);border-radius:3px;padding:3px 9px;white-space:nowrap;font-size:9px;flex-shrink:0}
+.tt.today{border-color:var(--gold);background:rgba(255,215,0,.06)}
+.tt.soon{border-color:rgba(0,229,255,.3)}
+.tt.retro{border-color:rgba(255,34,68,.4);background:rgba(255,34,68,.04)}
+.tt-icon{font-size:11px}
+.tt-text{color:var(--text);font-weight:600}
+.tt-date{color:var(--dim);font-size:8px}
+
+/* ─ PRICE STRIP ─ */
+.pstrip{display:flex;gap:4px;flex-shrink:0}
+.pc{flex:1;background:var(--panel);border:1px solid var(--border);border-radius:3px;padding:5px 8px;text-align:center;transition:border-color .3s}
+.pc.fl{border-color:var(--gold);box-shadow:0 0 7px rgba(255,215,0,.2)}
+.pcl{font-size:7px;letter-spacing:2px;color:var(--dim);margin-bottom:2px}
+.pcv{font-family:'Share Tech Mono',monospace;font-size:13px;font-weight:700}
+.pcs{font-size:8px;margin-top:1px;color:var(--dim)}
+
+/* ─ BODY GRID ─ */
+.body{display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:5px;flex:1;min-height:0}
+.pnl{background:var(--panel);border:1px solid var(--border);border-radius:4px;overflow:hidden;display:flex;flex-direction:column;min-height:0}
+.ph{display:flex;align-items:center;gap:5px;padding:4px 8px;background:var(--bg3);border-bottom:1px solid var(--border);flex-shrink:0}
+.pn{font-family:'Orbitron',sans-serif;font-size:6px;font-weight:700;color:var(--gold);background:rgba(255,215,0,.08);border:1px solid rgba(255,215,0,.2);padding:1px 3px;border-radius:2px;letter-spacing:1px}
+.pt{font-size:9px;font-weight:700;letter-spacing:2px;text-transform:uppercase}
+.sc{overflow-y:auto;flex:1;padding:6px 8px;display:flex;flex-direction:column;gap:5px}
+.sc::-webkit-scrollbar{width:2px}
+.sc::-webkit-scrollbar-thumb{background:var(--border);border-radius:2px}
+
+/* ─ SIGNAL ─ */
+.sig-hero{text-align:center;padding:10px 6px 8px;border-bottom:1px solid var(--border);flex-shrink:0}
+.sig-sub{font-size:7px;letter-spacing:3px;color:var(--dim);margin-bottom:3px}
+#sig{font-family:'Orbitron',sans-serif;font-size:17px;font-weight:900;letter-spacing:2px;text-shadow:0 0 20px currentColor;transition:all .4s}
+.s-sb{color:var(--green)}.s-b{color:#80FFB0}.s-n{color:var(--gold)}.s-s{color:#FF9090}.s-ss{color:var(--red)}.s-nt{color:var(--dim)}
+.meter{padding:6px 8px 2px}
+.ml{display:flex;justify-content:space-between;font-size:6px;color:var(--dim);margin-bottom:3px}
+.mtr{height:6px;border-radius:4px;background:linear-gradient(90deg,var(--red) 0%,#161616 40%,#161616 60%,var(--green) 100%);border:1px solid var(--border);position:relative}
+.mnd{position:absolute;top:-4px;width:13px;height:13px;border-radius:50%;background:#fff;border:2px solid var(--gold);transform:translateX(-50%);transition:left .7s cubic-bezier(.34,1.56,.64,1);box-shadow:0 0 8px var(--gold)}
+#bsc{text-align:center;font-family:'Orbitron',sans-serif;font-size:20px;font-weight:900;margin-top:2px;transition:color .4s}
+
+/* STAT GRID */
+.sg{display:grid;grid-template-columns:1fr 1fr;gap:3px}
+.si{background:var(--bg2);border:1px solid var(--border);border-radius:3px;padding:4px 6px}
+.sil{font-size:6px;letter-spacing:1px;color:var(--dim);margin-bottom:1px}
+.siv{font-size:10px;font-weight:700}
+.cg{color:var(--green)}.cr{color:var(--red)}.cg2{color:var(--gold)}.cb{color:var(--blue)}.co{color:var(--orange)}.cdm{color:var(--dim)}.cp{color:var(--purple)}
+.sec-t{font-size:6px;letter-spacing:2px;color:var(--dim)}
+.dv{height:1px;background:linear-gradient(90deg,transparent,var(--border),transparent)}
+
+/* FINISH BOX */
+#fb{padding:5px 7px;border-radius:3px;font-size:9px;font-weight:700;letter-spacing:1px;text-align:center}
+.fin-on{background:rgba(255,109,0,.12);border:1px solid var(--orange);color:var(--orange);animation:wp 2s ease-in-out infinite}
+@keyframes wp{0%,100%{box-shadow:none}50%{box-shadow:0 0 10px rgba(255,109,0,.4)}}
+.fin-ok{background:rgba(0,255,136,.04);border:1px solid rgba(0,255,136,.15);color:var(--dim)}
+
+/* TRANSIT SIGNALS */
+.transit-sig{padding:5px 7px;border-radius:3px;font-size:9px;font-weight:700;line-height:1.5}
+.ts-bull{background:rgba(0,255,136,.06);border:1px solid rgba(0,255,136,.3);color:var(--green)}
+.ts-bear{background:rgba(255,34,68,.06);border:1px solid rgba(255,34,68,.3);color:var(--red)}
+.ts-warn{background:rgba(255,109,0,.06);border:1px solid rgba(255,109,0,.3);color:var(--orange)}
+.ts-caution{background:rgba(255,215,0,.05);border:1px solid rgba(255,215,0,.2);color:var(--gold)}
+.ts-neutral{background:rgba(74,96,128,.1);border:1px solid var(--dim);color:var(--dim)}
+
+/* SUN/MOON CONFLICT */
+.conflict-box{padding:5px 7px;border-radius:3px;font-size:9px;font-weight:700;line-height:1.5}
+.cf-conflict{background:rgba(255,109,0,.08);border:1px solid var(--orange);color:var(--orange)}
+.cf-agree{background:rgba(0,229,255,.05);border:1px solid rgba(0,229,255,.2);color:var(--blue)}
+
+/* TRANSITION CARDS */
+.tg{display:grid;grid-template-columns:1fr 1fr;gap:3px}
+.tc{padding:6px;border-radius:3px;border:1px solid;text-align:center;cursor:pointer;transition:all .2s}
+.tc:hover{transform:scale(1.02)}
+.tc.active{box-shadow:0 0 8px currentColor;transform:scale(1.03)}
+.tc-bb{border-color:var(--green);color:var(--green);background:rgba(0,255,136,.04)}
+.tc-bs{border-color:#4A90D9;color:#4A90D9;background:rgba(74,144,217,.04)}
+.tc-rb{border-color:#D4A017;color:#D4A017;background:rgba(212,160,23,.04)}
+.tc-rs{border-color:var(--red);color:var(--red);background:rgba(255,34,68,.04)}
+.tc-no{border-color:var(--dim);color:var(--dim);background:rgba(74,96,128,.04);grid-column:1/-1}
+.tct{font-family:'Orbitron',sans-serif;font-size:6px;font-weight:700;letter-spacing:1px}
+.tcb{font-size:12px;font-weight:700;font-family:'Rajdhani',sans-serif}
+.tcs{font-size:7px;color:var(--dim)}
+
+/* SCORE BARS */
+.sbr{display:flex;align-items:center;gap:5px}
+.sbl{font-size:7px;letter-spacing:1px;color:var(--dim);width:85px;flex-shrink:0}
+.sbt{flex:1;height:4px;border-radius:3px;background:rgba(255,255,255,.05);overflow:hidden}
+.sbf{height:100%;border-radius:3px;transition:width .5s ease}
+.sbn{font-family:'Share Tech Mono',monospace;font-size:9px;width:28px;text-align:right}
+
+/* INPUTS */
+.aig{display:grid;grid-template-columns:1fr 1fr;gap:3px}
+.ag{display:flex;flex-direction:column;gap:1px}
+.ag label{font-size:6px;letter-spacing:1px;color:var(--dim)}
+.ag select,.ag input{background:var(--bg2);border:1px solid var(--border);color:var(--text);padding:2px 4px;border-radius:3px;font-family:'Rajdhani',sans-serif;font-size:10px;font-weight:600;outline:none}
+.ag select:focus,.ag input:focus{border-color:var(--gold)}
+
+/* DECISION */
+#decision{font-family:'Rajdhani',sans-serif;font-size:13px;font-weight:700;padding:10px;border-radius:3px;text-align:center;letter-spacing:1px;line-height:1.4;flex-shrink:0}
+.d-b{background:rgba(0,255,136,.1);border:1px solid var(--green);color:var(--green)}
+.d-s{background:rgba(255,34,68,.1);border:1px solid var(--red);color:var(--red)}
+.d-w{background:rgba(255,215,0,.06);border:1px solid rgba(255,215,0,.25);color:var(--gold)}
+.d-f{background:rgba(255,109,0,.1);border:1px solid var(--orange);color:var(--orange)}
+#fcs{padding:4px 6px;border-radius:3px;font-size:9px;font-weight:700;letter-spacing:1px;text-align:center;flex-shrink:0}
+.fw{background:rgba(0,255,136,.08);border:1px solid var(--green);color:var(--green)}
+.ff{background:rgba(255,34,68,.08);border:1px solid var(--red);color:var(--red)}
+.fn{background:rgba(74,96,128,.1);border:1px solid var(--dim);color:var(--dim)}
+
+/* LIVE ROWS */
+.lv{display:flex;justify-content:space-between;align-items:center;padding:3px 6px;background:var(--bg2);border-radius:3px;border:1px solid var(--border)}
+.lvl{font-size:7px;letter-spacing:1px;color:var(--dim);font-weight:700}
+.lvv{font-family:'Share Tech Mono',monospace;font-size:10px;font-weight:700}
+
+/* LEVELS TABLE */
+.lev-table{width:100%;border-collapse:collapse;font-size:10px}
+.lev-table th{font-size:6px;letter-spacing:2px;color:var(--dim);padding:3px 6px;text-align:left;border-bottom:1px solid var(--border);background:var(--bg3);position:sticky;top:0}
+.lev-table td{padding:3px 6px;border-bottom:1px solid rgba(26,42,64,.3);font-family:'Share Tech Mono',monospace;font-size:10px;font-weight:600}
+.lev-table tr.near td{background:rgba(255,215,0,.06)!important}
+.l-r2{color:#FF6060}.l-r1{color:var(--red)}.l-pp{color:var(--gold)}.l-s1{color:var(--green)}.l-s2{color:#60FFA0}.l-r3{color:#FF4040}.l-s3{color:#40FFB0}
+.l-yh{color:#FF9090}.l-yl{color:#90FF90}.l-yc{color:var(--dim)}.l-yo{color:var(--blue)}
+.near-b{display:inline-block;background:rgba(255,215,0,.2);border:1px solid var(--gold);color:var(--gold);font-size:6px;padding:1px 3px;border-radius:2px;font-family:'Rajdhani',sans-serif}
+
+/* ENTRY TABLE */
+.ep-t{width:100%;border-collapse:collapse}
+.ep-t th{font-size:6px;letter-spacing:2px;color:var(--dim);padding:3px 5px;text-align:left;border-bottom:1px solid var(--border);background:var(--bg3);position:sticky;top:0;z-index:1}
+.ep-t td{padding:3px 5px;border-bottom:1px solid rgba(26,42,64,.35);font-family:'Share Tech Mono',monospace;font-size:10px;font-weight:600}
+.ep-t tr.near td{background:rgba(255,215,0,.05)!important}
+.ep-t tr:hover td{background:rgba(255,255,255,.015)}
+.rb1 td:first-child{border-left:3px solid var(--green)}.rb2 td:first-child{border-left:3px solid #3ADB70}
+.rs1 td:first-child{border-left:3px solid var(--red)}.rs2 td:first-child{border-left:3px solid #CC2244}
+.rco td:first-child{border-left:3px solid var(--gold)}.rin td:first-child{border-left:3px solid var(--orange)}
+.rsl td:first-child{border-left:3px solid #FF0000}
+.rt1 td:first-child{border-left:3px solid #00FF88}.rt2 td:first-child{border-left:3px solid #00CC66}
+.rt3 td:first-child{border-left:3px solid #009944}.rt4 td:first-child{border-left:3px solid #006633}
+.elbl{color:var(--text);font-family:'Rajdhani',sans-serif;font-weight:700;font-size:9px;letter-spacing:1px}
+
+/* ── BACKTEST MODULE ── */
+.bt-overlay{position:fixed;inset:0;background:rgba(4,8,16,.97);z-index:1000;display:none;flex-direction:column;overflow:hidden}
+.bt-overlay.show{display:flex}
+.bt-header{display:flex;align-items:center;justify-content:space-between;padding:10px 20px;background:linear-gradient(135deg,#071220,#0C1C38);border-bottom:1px solid var(--gold);flex-shrink:0}
+.bt-logo{font-family:'Orbitron',sans-serif;font-size:16px;font-weight:900;color:var(--gold);letter-spacing:3px}
+.bt-body{display:grid;grid-template-columns:280px 1fr;gap:0;flex:1;min-height:0;overflow:hidden}
+.bt-sidebar{background:var(--bg2);border-right:1px solid var(--border);padding:14px;display:flex;flex-direction:column;gap:10px;overflow-y:auto}
+.bt-main{padding:14px;overflow-y:auto;display:flex;flex-direction:column;gap:10px}
+.bt-section{background:var(--panel);border:1px solid var(--border);border-radius:4px;overflow:hidden}
+.bt-sh{padding:6px 10px;background:var(--bg3);border-bottom:1px solid var(--border);font-size:10px;font-weight:700;letter-spacing:2px;color:var(--gold)}
+.bt-sb{padding:10px}
+.bt-date-picker{display:flex;flex-direction:column;gap:5px}
+.bt-date-picker label{font-size:8px;letter-spacing:1px;color:var(--dim)}
+.bt-date-input{background:var(--bg3);border:1px solid var(--border);color:var(--gold);padding:6px 10px;border-radius:3px;font-family:'Share Tech Mono',monospace;font-size:14px;outline:none;width:100%}
+.bt-date-input:focus{border-color:var(--gold)}
+.bt-btn{font-family:'Rajdhani',sans-serif;font-size:11px;font-weight:700;letter-spacing:1px;padding:7px 14px;border-radius:3px;cursor:pointer;border:1px solid;background:transparent;text-transform:uppercase;transition:all .2s;width:100%}
+.bt-btn:hover{opacity:.8}
+.bt-btn-gold{border-color:var(--gold);color:var(--gold)}
+.bt-btn-blue{border-color:var(--blue);color:var(--blue)}
+.bt-btn-green{border-color:var(--green);color:var(--green)}
+.bt-btn-red{border-color:var(--red);color:var(--red)}
+.bt-signal-box{text-align:center;padding:14px;border-radius:3px;font-family:'Orbitron',sans-serif;font-size:18px;font-weight:900;letter-spacing:2px}
+.bt-stat-grid{display:grid;grid-template-columns:1fr 1fr;gap:6px}
+.bt-stat{background:var(--bg2);border:1px solid var(--border);border-radius:3px;padding:8px 10px;text-align:center}
+.bt-sl{font-size:7px;letter-spacing:1px;color:var(--dim);margin-bottom:3px}
+.bt-sv{font-size:16px;font-weight:700;font-family:'Orbitron',sans-serif;color:var(--gold)}
+.bt-table{width:100%;border-collapse:collapse;font-size:10px}
+.bt-table th{font-size:7px;letter-spacing:2px;color:var(--dim);padding:5px 8px;text-align:left;border-bottom:1px solid var(--border);background:var(--bg3);position:sticky;top:0}
+.bt-table td{padding:5px 8px;border-bottom:1px solid rgba(26,42,64,.4);font-family:'Share Tech Mono',monospace}
+.bt-win{color:var(--green)}.bt-loss{color:var(--red)}.bt-na{color:var(--dim)}
+.bt-progress{background:var(--bg2);border:1px solid var(--border);border-radius:3px;padding:10px;text-align:center}
+.bt-bar-wrap{height:8px;background:rgba(255,255,255,.05);border-radius:4px;overflow:hidden;margin:6px 0}
+.bt-bar-fill{height:100%;background:var(--green);border-radius:4px;transition:width .3s}
+.bt-calendar{display:grid;grid-template-columns:repeat(7,1fr);gap:2px}
+.bt-cal-day{padding:4px;text-align:center;font-size:9px;cursor:pointer;border-radius:2px;border:1px solid transparent;font-family:'Share Tech Mono',monospace}
+.bt-cal-day:hover{border-color:var(--gold);background:rgba(255,215,0,.08)}
+.bt-cal-day.selected{border-color:var(--gold);background:rgba(255,215,0,.15);color:var(--gold)}
+.bt-cal-day.has-data{color:var(--text)}
+.bt-cal-day.no-data{color:var(--dim);cursor:default}
+.bt-cal-day.win-day{background:rgba(0,255,136,.08)}
+.bt-cal-day.loss-day{background:rgba(255,34,68,.08)}
+.bt-cal-hdr{font-size:7px;color:var(--dim);text-align:center;padding:2px;letter-spacing:1px}
+.bt-moon-bar{display:flex;align-items:center;gap:6px;margin-bottom:4px}
+.bt-moon-lbl{font-size:9px;color:var(--dim);width:90px;flex-shrink:0}
+.bt-moon-track{flex:1;height:5px;border-radius:3px;background:rgba(255,255,255,.05);overflow:hidden}
+.bt-moon-fill{height:100%;border-radius:3px}
+.bt-moon-pct{font-size:9px;width:35px;text-align:right;font-family:'Share Tech Mono',monospace}
+/* MTF PANEL */
+.mtf-wrap{display:flex;gap:5px;flex-direction:column}
+.mtf-tf{background:var(--bg2);border:1px solid var(--border);border-radius:3px;padding:5px 7px}
+.mtf-hdr{display:flex;align-items:center;justify-content:space-between;margin-bottom:4px}
+.mtf-title{font-size:8px;letter-spacing:2px;color:var(--dim);font-weight:700}
+.mtf-dir{font-family:'Orbitron',sans-serif;font-size:9px;font-weight:900;letter-spacing:1px;padding:2px 8px;border-radius:2px}
+.mtf-bull{background:rgba(0,255,136,.15);border:1px solid var(--green);color:var(--green)}
+.mtf-bear{background:rgba(255,34,68,.15);border:1px solid var(--red);color:var(--red)}
+.mtf-neut{background:rgba(74,96,128,.15);border:1px solid var(--dim);color:var(--dim)}
+.mtf-candles{display:flex;gap:3px;flex-wrap:wrap}
+.mtf-c{display:flex;flex-direction:column;align-items:center;gap:1px;padding:3px 5px;border-radius:2px;border:1px solid;min-width:52px}
+.mtf-c.bull{border-color:rgba(0,255,136,.3);background:rgba(0,255,136,.04)}
+.mtf-c.bear{border-color:rgba(255,34,68,.3);background:rgba(255,34,68,.04)}
+.mtf-cdt{font-size:7px;color:var(--dim);font-family:'Share Tech Mono',monospace}
+.mtf-cc{font-size:9px;font-weight:700;font-family:'Share Tech Mono',monospace}
+.mtf-ct{font-size:7px;letter-spacing:1px;font-weight:700}
+.mtf-signal{padding:5px 7px;border-radius:3px;font-size:10px;font-weight:700;letter-spacing:1px;text-align:center}
+.mtf-strong-buy{background:rgba(0,255,136,.1);border:1px solid var(--green);color:var(--green)}
+.mtf-strong-sell{background:rgba(255,34,68,.1);border:1px solid var(--red);color:var(--red)}
+.mtf-pullback{background:rgba(255,215,0,.08);border:1px solid var(--gold);color:var(--gold)}
+.mtf-bounce{background:rgba(0,229,255,.08);border:1px solid var(--blue);color:var(--blue)}
+.mtf-conflict{background:rgba(255,109,0,.08);border:1px solid var(--orange);color:var(--orange)}
+/* NEXT ACTION */
+#na{background:var(--bg2);border:1px solid var(--border);border-radius:3px;padding:6px 8px;font-size:9px;line-height:1.7;color:var(--dim);flex-shrink:0}
+
+/* CONF RING */
+.cring{display:flex;align-items:center;gap:8px}
+.rw{position:relative;width:46px;height:46px;flex-shrink:0}
+.rw svg{transform:rotate(-90deg)}
+.rv{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-family:'Orbitron',sans-serif;font-size:10px;font-weight:900;color:var(--gold)}
+.cd{font-size:8px;line-height:1.6;color:var(--dim)}
+
+/* MANUAL */
+#manb{display:none;flex-shrink:0}
+#manb.show{display:flex;flex-wrap:wrap;gap:6px;align-items:center;background:rgba(255,109,0,.06);border:1px solid var(--orange);border-radius:3px;padding:4px 8px}
+.mgl{font-size:7px;color:var(--dim)}
+.mi{background:var(--bg3);border:1px solid var(--border);color:var(--gold);padding:3px 5px;border-radius:2px;font-family:'Share Tech Mono',monospace;font-size:11px;width:80px;outline:none}
+.mi:focus{border-color:var(--gold)}
+
+/* GOOGLE SHEET STATUS */
+#gs-status{font-size:8px;letter-spacing:1px}
+</style>
+</head>
+<body>
+<!-- PASSWORD PROTECTION -->
+<div id="pw-screen" style="position:fixed;inset:0;background:#040810;z-index:9999;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:20px">
+  <div style="font-family:'Orbitron',sans-serif;font-size:24px;font-weight:900;color:var(--gold);letter-spacing:4px;text-shadow:0 0 20px rgba(255,215,0,.4)">ADHAM SYSTEM</div>
+  <div style="font-size:10px;letter-spacing:3px;color:var(--blue)">XAUUSD · PRIVATE ACCESS</div>
+  <div style="display:flex;flex-direction:column;gap:10px;align-items:center;margin-top:10px">
+    <input id="pw-input" type="password" placeholder="Enter password" 
+      style="background:rgba(255,215,0,.08);border:1px solid var(--gold);color:var(--gold);padding:12px 20px;border-radius:4px;font-family:'Share Tech Mono',monospace;font-size:16px;outline:none;width:260px;text-align:center;letter-spacing:3px"
+      onkeydown="if(event.key==='Enter')checkPW()">
+    <button onclick="checkPW()" 
+      style="background:rgba(255,215,0,.1);border:1px solid var(--gold);color:var(--gold);padding:10px 30px;border-radius:3px;font-family:'Orbitron',sans-serif;font-size:11px;font-weight:700;letter-spacing:2px;cursor:pointer;width:260px">
+      ACCESS SYSTEM
+    </button>
+    <div id="pw-error" style="color:var(--red);font-size:10px;letter-spacing:1px;display:none">⚠ INCORRECT PASSWORD</div>
+  </div>
+</div>
+
+<script>
+// Password check - runs before anything else
+(function(){
+  const HASH = 'Adham3698986@';
+  function checkPW(){
+    const v = document.getElementById('pw-input').value;
+    if(v === HASH){
+      document.getElementById('pw-screen').style.display='none';
+      sessionStorage.setItem('adham_auth','1');
+    } else {
+      document.getElementById('pw-error').style.display='block';
+      document.getElementById('pw-input').value='';
+      document.getElementById('pw-input').focus();
+    }
+  }
+  window.checkPW = checkPW;
+  // Password disabled — auto-unlock on load (local use)
+  sessionStorage.setItem('adham_auth','1');
+  window.addEventListener('DOMContentLoaded',()=>{
+    const s=document.getElementById('pw-screen');
+    if(s) s.style.display='none';
+  });
+})();
+</script>
+
+<div class="root">
+<!-- CORS NOTICE - shown only when running from local file -->
+<div id="cors-notice" style="display:none;background:#1A0A00;border:1px solid var(--orange);border-radius:3px;padding:6px 12px;font-size:10px;color:var(--orange);text-align:center;flex-shrink:0">
+  ⚡ Running from local file -- using CORS proxy to fetch live data. First load may take 5–10 seconds.
+</div>
+<!-- HEADER -->
+<div class="hdr">
+  <div><div class="logo">ADHAM SYSTEM<sub>XAUUSD · COMPLETE INTRADAY INTELLIGENCE</sub></div></div>
+  <div class="hdr-mid">
+    <div id="pbig">----.----</div>
+    <div id="pchg" style="color:var(--dim)">open price input to begin</div>
+  </div>
+  <div class="hdr-right">
+    <div class="hdr-row">
+      <div class="dot" id="dot" style="background:var(--gold)"></div>
+      <span id="clk">--:--:--</span>
+      <span id="sess" class="bdg bc">--</span>
+      <span id="fst" class="bdg bf">MANUAL MODE</span>
+      <span id="gs-status" class="cdm" style="cursor:pointer" onclick="fetchSheet()">Sheet: --</span>
+    </div>
+    <div class="hdr-row">
+      <span id="tdate" style="font-family:'Share Tech Mono',monospace;font-size:10px;color:var(--gold)">--</span>
+      <button class="btn bo" onclick="toggleMan()">PRICE INPUT</button>
+      <button class="btn bb" onclick="fetchSheet()">↺ FETCH SHEET</button>
+      <button class="btn bb" onclick="tryAutoFetch()">↺ AUTO PRICE</button>
+      <button class="btn bg" onclick="showDebug()" style="font-size:9px">DEBUG</button>
+      <button class="btn bg" onclick="openBT()" style="font-size:9px;border-color:var(--purple);color:var(--purple)">📊 BACKTEST</button>
+      <button class="btn bg" onclick="fetch4HSheet().then(()=>recalc())" style="font-size:9px;border-color:var(--blue);color:var(--blue)">↺ 4H</button>
+    </div>
+  </div>
+</div>
+
+<!-- ASTRO AUTO BAR -->
+<div class="astro-bar">
+  <span class="ab-lbl">📅 TODAY AUTO</span>
+  <div class="abt auto"><span class="abtl">DATE</span><span class="abtv" id="ab-date">--</span></div>
+  <div class="abt auto"><span class="abtl">MOON SIGN</span><span class="abtv" id="ab-ms">--</span></div>
+  <div class="abt auto"><span class="abtl">MOON PHASE</span><span class="abtv" id="ab-mp">--</span></div>
+  <div class="abt auto"><span class="abtl">CYCLE</span><span class="abtv" id="ab-cs">--</span></div>
+  <div class="abt auto"><span class="abtl">STAGE#</span><span class="abtv" id="ab-sn">--</span></div>
+  <div class="abt auto"><span class="abtl">DAY#</span><span class="abtv" id="ab-dn">--</span></div>
+  <div class="abt auto"><span class="abtl">GENDER</span><span class="abtv" id="ab-g">--</span></div>
+  <div class="abt auto"><span class="abtl">SUN SIGN</span><span class="abtv" id="ab-sun">--</span></div>
+  <div class="abt"><span class="abtl">CONFIDENCE</span><span class="abtv" id="ab-conf" style="color:var(--blue)">--</span></div>
+  <div class="abt" id="ab-zod"><span class="abtl">ZODIAC BIAS</span><span class="abtv" id="ab-zbias">--</span></div>
+  <div class="abt auto" style="margin-left:auto"><span class="abtl">NEXT SIGN</span><span class="abtv" id="ab-next">--</span></div>
+</div>
+
+<!-- TRANSIT TICKER -->
+<div class="transit-bar" id="transit-bar"></div>
+
+<!-- MANUAL PRICE BAR -->
+<div id="manb">
+  <span style="font-size:8px;letter-spacing:1px;color:var(--orange);font-weight:700">⚡ PRICE INPUT</span>
+  <div style="display:flex;align-items:center;gap:3px"><span class="mgl">PRICE</span><input class="mi" id="mi-p" type="number" placeholder="3320.00" step="0.1" oninput="applyMan()"></div>
+  <div style="display:flex;align-items:center;gap:3px"><span class="mgl">OPEN</span><input class="mi" id="mi-o" type="number" placeholder="3310.00" step="0.1" oninput="applyMan()"></div>
+  <div style="display:flex;align-items:center;gap:3px"><span class="mgl">HIGH</span><input class="mi" id="mi-h" type="number" placeholder="3335.00" step="0.1" oninput="applyMan()"></div>
+  <div style="display:flex;align-items:center;gap:3px"><span class="mgl">LOW</span><input class="mi" id="mi-l" type="number" placeholder="3295.00" step="0.1" oninput="applyMan()"></div>
+  <div style="display:flex;align-items:center;gap:3px"><span class="mgl">PREV CLOSE</span><input class="mi" id="mi-c" type="number" placeholder="3308.00" step="0.1" oninput="applyMan()"></div>
+  <button class="btn bo" style="margin-left:auto" onclick="toggleMan()">HIDE</button>
+</div>
+
+<!-- PRICE STRIP -->
+<div class="pstrip">
+  <div class="pc"><div class="pcl">TODAY OPEN</div><div class="pcv" id="p-o" style="color:var(--blue)">--</div></div>
+  <div class="pc"><div class="pcl">TODAY HIGH</div><div class="pcv" id="p-h" style="color:var(--red)">--</div></div>
+  <div class="pc"><div class="pcl">TODAY LOW</div><div class="pcv" id="p-l" style="color:var(--green)">--</div></div>
+  <div class="pc"><div class="pcl">PREV CLOSE</div><div class="pcv" id="p-pc" style="color:var(--dim)">--</div></div>
+  <div class="pc"><div class="pcl">YEST HIGH</div><div class="pcv" id="p-yh" style="color:#FF9090">--</div></div>
+  <div class="pc"><div class="pcl">YEST LOW</div><div class="pcv" id="p-yl" style="color:#90FF90">--</div></div>
+  <div class="pc"><div class="pcl">YEST CLOSE</div><div class="pcv" id="p-yc" style="color:var(--dim)">--</div></div>
+  <div class="pc"><div class="pcl">DAY CHANGE</div><div class="pcv" id="p-dc">--</div><div class="pcs" id="p-dcp">--</div></div>
+  <div class="pc"><div class="pcl">LAST UPDATE</div><div class="pcv" id="p-ts" style="font-size:10px;color:var(--dim)">--</div><div class="pcs" id="p-cd">--</div></div>
+</div>
+
+<!-- 4 COLUMNS -->
+<div class="body">
+
+<!-- COL 1: SIGNAL + ASTRO INPUTS -->
+<div class="pnl">
+  <div class="ph"><span class="pn">§1</span><span class="pt">Signal + Astro</span></div>
+  <div class="sig-hero">
+    <div class="sig-sub">FINAL SIGNAL</div>
+    <div id="sig" class="s-nt">◼ ENTER PRICE</div>
+    <div class="meter">
+      <div class="ml"><span>BEAR −100</span><span>BULL +100</span></div>
+      <div class="mtr"><div class="mnd" id="nd"></div></div>
+      <div id="bsc" style="color:var(--gold)">--</div>
+    </div>
+  </div>
+  <div class="sc">
+    <div class="sg">
+      <div class="si"><div class="sil">RISK</div><div class="siv" id="s-risk">--</div></div>
+      <div class="si"><div class="sil">STYLE</div><div class="siv" id="s-style">--</div></div>
+      <div class="si"><div class="sil">BUY SCORE</div><div class="siv cg" id="s-buy">--</div></div>
+      <div class="si"><div class="sil">SELL SCORE</div><div class="siv cr" id="s-sell">--</div></div>
+      <div class="si"><div class="sil">MOON SCORE</div><div class="siv cg2" id="s-moon">--</div></div>
+      <div class="si"><div class="sil">SUN SCORE</div><div class="siv cp" id="s-sun">--</div></div>
+      <div class="si"><div class="sil">TRANSIT SCR</div><div class="siv cb" id="s-trans2">--</div></div>
+      <div class="si"><div class="sil">MTF SCORE</div><div class="siv" id="s-mtf">--</div></div>
+      <div class="si"><div class="sil">LIVE SCORE</div><div class="siv cg" id="s-live">--</div></div>
+    </div>
+    <div id="fb" class="fin-ok">✅ Stage OK</div>
+    <div id="weight-mode" style="font-size:9px;color:var(--dim)">--</div>
+
+    <!-- SUN/MOON CONFLICT -->
+    <div class="conflict-box cf-agree" id="conflict-box">✅ Sun & Moon Aligned</div>
+
+    <!-- TRANSIT SIGNAL TODAY -->
+    <div id="transit-sig" class="transit-sig ts-neutral">No major transits today</div>
+
+    <!-- CONFIDENCE -->
+    <div class="dv"></div>
+    <div class="sec-t">CONFIDENCE</div>
+    <div class="cring">
+      <div class="rw">
+        <svg width="46" height="46" viewBox="0 0 46 46">
+          <circle cx="23" cy="23" r="17" fill="none" stroke="#1A2A40" stroke-width="5"/>
+          <circle cx="23" cy="23" r="17" fill="none" stroke="var(--blue)" stroke-width="5"
+            stroke-dasharray="106.8" id="crf" stroke-dashoffset="106.8" stroke-linecap="round"/>
+        </svg>
+        <div class="rv" id="crv">--</div>
+      </div>
+      <div class="cd" id="crd">Calculating...</div>
+    </div>
+
+    <div class="dv"></div>
+    <div class="sec-t">TRANSITION</div>
+    <div class="tg">
+      <div class="tc tc-bb active" id="tc-BULL-BUY" onclick="setTr('BULL-BUY')"><div class="tct">BULL→BUY</div><div class="tcb">+30</div><div class="tcs">Continuation</div></div>
+      <div class="tc tc-bs" id="tc-BULL-SELL" onclick="setTr('BULL-SELL')"><div class="tct">BULL→SELL</div><div class="tcb">+15</div><div class="tcs">Profit Take</div></div>
+      <div class="tc tc-rb" id="tc-BEAR-BUY" onclick="setTr('BEAR-BUY')"><div class="tct">BEAR→BUY</div><div class="tcb">+15</div><div class="tcs">Counter</div></div>
+      <div class="tc tc-rs" id="tc-BEAR-SELL" onclick="setTr('BEAR-SELL')"><div class="tct">BEAR→SELL</div><div class="tcb">+30</div><div class="tcs">Continuation</div></div>
+      <div class="tc tc-no" id="tc-NO TRADE" onclick="setTr('NO TRADE')"><div class="tct">NO TRADE</div><div class="tcb">--</div></div>
+    </div>
+
+    <div class="dv"></div>
+    <div class="sec-t">OVERRIDES (manual)</div>
+    <div class="aig">
+      <div class="ag"><label>AVG BULL $</label><input type="number" id="abull" value="18.5" step="0.1" onchange="recalc()"></div>
+      <div class="ag"><label>AVG BEAR $</label><input type="number" id="abear" value="14.2" step="0.1" onchange="recalc()"></div>
+      <div class="ag"><label>AVG RANGE $</label><input type="number" id="arng" value="22.0" step="0.1" onchange="recalc()"></div>
+      <div class="ag"><label>HIST MATCHES</label><input type="number" id="hist" value="10" min="0" onchange="recalc()"></div>
+    </div>
+
+    <div class="dv"></div>
+    <div class="sec-t">SCORE BREAKDOWN</div>
+    <div id="sbars" style="display:flex;flex-direction:column;gap:4px"></div>
+  </div>
+</div>
+
+<!-- COL 2: LIVE DECISION -->
+<div class="pnl">
+  <div class="ph"><span class="pn">§2</span><span class="pt">Live Market Decision</span></div>
+  <div style="padding:6px 8px 4px;display:flex;flex-direction:column;gap:4px;flex-shrink:0">
+    <div id="decision" class="d-w">⚡ ENTER PRICE TO BEGIN</div>
+    <div id="fcs" class="fn">◼ AWAITING DATA</div>
+  </div>
+  <div class="sc">
+    <div style="display:flex;flex-direction:column;gap:3px">
+      <div class="lv"><span class="lvl">CURRENT PRICE</span><span class="lvv cg2" id="lv-p">--</span></div>
+      <div class="lv"><span class="lvl">vs TODAY OPEN</span><span class="lvv" id="lv-o">--</span></div>
+      <div class="lv"><span class="lvl">vs PREV CLOSE</span><span class="lvv" id="lv-c">--</span></div>
+      <div class="lv"><span class="lvl">vs TODAY HIGH</span><span class="lvv" id="lv-h">--</span></div>
+      <div class="lv"><span class="lvl">vs TODAY LOW</span><span class="lvv" id="lv-l">--</span></div>
+      <div class="lv"><span class="lvl">vs PIVOT PP</span><span class="lvv" id="lv-pp">--</span></div>
+      <div class="lv"><span class="lvl">vs YEST HIGH</span><span class="lvv" id="lv-yh">--</span></div>
+      <div class="lv"><span class="lvl">vs YEST LOW</span><span class="lvv" id="lv-yl">--</span></div>
+      <div class="lv"><span class="lvl">INVALIDATION</span><span class="lvv co" id="lv-inv">--</span></div>
+      <div class="lv"><span class="lvl">RANGE MAP</span><span class="lvv cb" id="lv-rng">--</span></div>
+    </div>
+
+    <div class="dv"></div>
+    <div class="sec-t">STAGE & TRANSITION RULE</div>
+    <div id="stage-det" style="font-size:9px;line-height:1.7;color:var(--dim)">--</div>
+
+    <div class="dv"></div>
+    <div class="sec-t">SUN SIGN CONTEXT (LONG TERM)</div>
+    <div id="sun-context" style="font-size:9px;line-height:1.7;color:var(--dim)">--</div>
+
+    <div class="dv"></div>
+    <div class="sec-t">ACTIVE RETROGRADES</div>
+    <div id="retro-status" style="font-size:9px;line-height:1.6;color:var(--dim)">--</div>
+
+    <div class="dv"></div>
+    <div class="sec-t">NEXT ACTION PLAN</div>
+    <div id="na">--</div>
+    <div class="dv"></div>
+    <div class="sec-t">MULTI-TIMEFRAME ANALYSIS</div>
+    <div id="mtf-panel" class="mtf-wrap">
+      <div class="mtf-tf">
+        <div class="mtf-hdr">
+          <span class="mtf-title">DAILY</span>
+          <span class="mtf-dir mtf-neut" id="mtf-daily-dir">--</span>
+        </div>
+        <div style="font-size:9px;color:var(--dim)" id="mtf-daily-txt">Loading...</div>
+      </div>
+      <div class="mtf-tf">
+        <div class="mtf-hdr">
+          <span class="mtf-title">4 HOUR</span>
+          <span class="mtf-dir mtf-neut" id="mtf-4h-dir">--</span>
+        </div>
+        <div class="mtf-candles" id="mtf-4h-candles"></div>
+      </div>
+      <div class="mtf-tf">
+        <div class="mtf-hdr">
+          <span class="mtf-title">1 HOUR</span>
+          <span class="mtf-dir mtf-neut" id="mtf-1h-dir">--</span>
+        </div>
+        <div class="mtf-candles" id="mtf-1h-candles"></div>
+      </div>
+      <div class="mtf-signal mtf-neut" id="mtf-signal">AWAITING DATA</div>
+    </div>
+  </div>
+</div>
+
+<!-- COL 3: KEY LEVELS -->
+<div class="pnl">
+  <div class="ph"><span class="pn">§3</span><span class="pt">Key Levels · Yesterday + Today</span></div>
+  <div style="flex:1;overflow-y:auto;min-height:0">
+    <table class="lev-table">
+      <thead><tr><th style="width:90px">LEVEL</th><th>PRICE</th><th>TYPE</th><th>STATUS</th></tr></thead>
+      <tbody id="lev-body"></tbody>
+    </table>
+  </div>
+  <div style="padding:4px 8px;border-top:1px solid var(--border);flex-shrink:0">
+    <div style="display:flex;gap:5px;flex-wrap:wrap;font-size:9px">
+      <span>ATR: <b class="cb" id="ep-atr">--</b></span>
+      <span>RANGE: <b class="cb" id="ep-rng">--</b></span>
+    </div>
+  </div>
+</div>
+
+<!-- COL 4: ENTRY PLAN -->
+<div class="pnl">
+  <div class="ph"><span class="pn">§4</span><span class="pt">Entry Plan · Auto-Calculated</span></div>
+  <div style="flex:1;overflow-y:auto;min-height:0">
+    <table class="ep-t">
+      <thead><tr><th style="width:95px">LEVEL</th><th>PRICE</th><th>R:R</th><th>STATUS</th></tr></thead>
+      <tbody id="ep-body"></tbody>
+    </table>
+  </div>
+  <div style="padding:4px 8px;border-top:1px solid var(--border);flex-shrink:0;display:flex;flex-direction:column;gap:4px">
+    <div id="na2" style="font-size:9px;line-height:1.6;color:var(--dim)">--</div>
+  </div>
+</div>
+
+</div><!-- body -->
+</div><!-- root -->
+
+<script>
+// ==========================================================
+// EMBEDDED DATA
+// ==========================================================
+const MOON_CSV=[
+{d:"1/1/2026",dn:1,ms:"Gemini",mp:"Waxing Gibbous",cs:"FINISH",sn:3,g:"MALE"},
+{d:"1/2/2026",dn:2,ms:"Gemini",mp:"Waxing Gibbous",cs:"FINISH",sn:3,g:"MALE"},
+{d:"1/3/2026",dn:3,ms:"Cancer",mp:"Full Moon",cs:"START",sn:1,g:"FEMALE"},
+{d:"1/4/2026",dn:4,ms:"Cancer",mp:"Waning Gibbous",cs:"START",sn:1,g:"FEMALE"},
+{d:"1/5/2026",dn:5,ms:"Leo",mp:"Waning Gibbous",cs:"MOVE",sn:2,g:"MALE"},
+{d:"1/6/2026",dn:6,ms:"Leo",mp:"Waning Gibbous",cs:"MOVE",sn:2,g:"MALE"},
+{d:"1/7/2026",dn:7,ms:"Virgo",mp:"Waning Gibbous",cs:"FINISH",sn:3,g:"FEMALE"},
+{d:"1/8/2026",dn:8,ms:"Virgo",mp:"Waning Gibbous",cs:"FINISH",sn:3,g:"FEMALE"},
+{d:"1/9/2026",dn:9,ms:"Libra",mp:"Waning Gibbous",cs:"START",sn:1,g:"MALE"},
+{d:"1/10/2026",dn:1,ms:"Libra",mp:"Last Quarter",cs:"START",sn:1,g:"MALE"},
+{d:"1/11/2026",dn:2,ms:"Scorpio",mp:"Waning Crescent",cs:"MOVE",sn:2,g:"FEMALE"},
+{d:"1/12/2026",dn:3,ms:"Scorpio",mp:"Waning Crescent",cs:"MOVE",sn:2,g:"FEMALE"},
+{d:"1/13/2026",dn:4,ms:"Scorpio",mp:"Waning Crescent",cs:"MOVE",sn:2,g:"FEMALE"},
+{d:"1/14/2026",dn:5,ms:"Sagittarius",mp:"Waning Crescent",cs:"FINISH",sn:3,g:"MALE"},
+{d:"1/15/2026",dn:6,ms:"Sagittarius",mp:"Waning Crescent",cs:"FINISH",sn:3,g:"MALE"},
+{d:"1/16/2026",dn:7,ms:"Capricorn",mp:"Waning Crescent",cs:"START",sn:1,g:"FEMALE"},
+{d:"1/17/2026",dn:8,ms:"Capricorn",mp:"Waning Crescent",cs:"START",sn:1,g:"FEMALE"},
+{d:"1/18/2026",dn:9,ms:"Capricorn",mp:"New Moon",cs:"START",sn:1,g:"FEMALE"},
+{d:"1/19/2026",dn:1,ms:"Aquarius",mp:"Waxing Crescent",cs:"MOVE",sn:2,g:"MALE"},
+{d:"1/20/2026",dn:2,ms:"Aquarius",mp:"Waxing Crescent",cs:"MOVE",sn:2,g:"MALE"},
+{d:"1/21/2026",dn:3,ms:"Pisces",mp:"Waxing Crescent",cs:"FINISH",sn:3,g:"FEMALE"},
+{d:"1/22/2026",dn:4,ms:"Pisces",mp:"Waxing Crescent",cs:"FINISH",sn:3,g:"FEMALE"},
+{d:"1/23/2026",dn:5,ms:"Aries",mp:"Waxing Crescent",cs:"FINISH",sn:3,g:"FEMALE"},
+{d:"1/24/2026",dn:6,ms:"Aries",mp:"Waxing Crescent",cs:"START",sn:1,g:"MALE"},
+{d:"1/25/2026",dn:7,ms:"Aries",mp:"Waxing Crescent",cs:"START",sn:1,g:"MALE"},
+{d:"1/26/2026",dn:8,ms:"Taurus",mp:"First Quarter",cs:"MOVE",sn:2,g:"FEMALE"},
+{d:"1/27/2026",dn:9,ms:"Taurus",mp:"Waxing Gibbous",cs:"MOVE",sn:2,g:"FEMALE"},
+{d:"1/28/2026",dn:1,ms:"Gemini",mp:"Waxing Gibbous",cs:"FINISH",sn:3,g:"MALE"},
+{d:"1/29/2026",dn:2,ms:"Gemini",mp:"Waxing Gibbous",cs:"FINISH",sn:3,g:"MALE"},
+{d:"1/30/2026",dn:3,ms:"Cancer",mp:"Waxing Gibbous",cs:"START",sn:1,g:"FEMALE"},
+{d:"1/31/2026",dn:4,ms:"Cancer",mp:"Waxing Gibbous",cs:"START",sn:1,g:"FEMALE"},
+{d:"2/1/2026",dn:1,ms:"Leo",mp:"Full Moon",cs:"MOVE",sn:2,g:"MALE"},
+{d:"2/2/2026",dn:2,ms:"Leo",mp:"Waning Gibbous",cs:"MOVE",sn:2,g:"MALE"},
+{d:"2/3/2026",dn:3,ms:"Virgo",mp:"Waning Gibbous",cs:"FINISH",sn:3,g:"FEMALE"},
+{d:"2/4/2026",dn:4,ms:"Virgo",mp:"Waning Gibbous",cs:"FINISH",sn:3,g:"FEMALE"},
+{d:"2/5/2026",dn:5,ms:"Libra",mp:"Waning Gibbous",cs:"START",sn:1,g:"MALE"},
+{d:"2/6/2026",dn:6,ms:"Libra",mp:"Waning Gibbous",cs:"START",sn:1,g:"MALE"},
+{d:"2/7/2026",dn:7,ms:"Libra",mp:"Waning Gibbous",cs:"START",sn:1,g:"MALE"},
+{d:"2/8/2026",dn:8,ms:"Scorpio",mp:"Waning Gibbous",cs:"MOVE",sn:2,g:"FEMALE"},
+{d:"2/9/2026",dn:9,ms:"Scorpio",mp:"Last Quarter",cs:"MOVE",sn:2,g:"FEMALE"},
+{d:"2/10/2026",dn:1,ms:"Sagittarius",mp:"Waning Crescent",cs:"FINISH",sn:3,g:"MALE"},
+{d:"2/11/2026",dn:2,ms:"Sagittarius",mp:"Waning Crescent",cs:"FINISH",sn:3,g:"MALE"},
+{d:"2/12/2026",dn:3,ms:"Sagittarius",mp:"Waning Crescent",cs:"FINISH",sn:3,g:"MALE"},
+{d:"2/13/2026",dn:4,ms:"Capricorn",mp:"Waning Crescent",cs:"START",sn:1,g:"FEMALE"},
+{d:"2/14/2026",dn:5,ms:"Capricorn",mp:"Waning Crescent",cs:"START",sn:1,g:"FEMALE"},
+{d:"2/15/2026",dn:6,ms:"Aquarius",mp:"Waning Crescent",cs:"MOVE",sn:2,g:"MALE"},
+{d:"2/16/2026",dn:7,ms:"Aquarius",mp:"Waning Crescent",cs:"MOVE",sn:2,g:"MALE"},
+{d:"2/17/2026",dn:8,ms:"Aquarius",mp:"New Moon",cs:"MOVE",sn:2,g:"MALE"},
+{d:"2/18/2026",dn:9,ms:"Pisces",mp:"Waxing Crescent",cs:"FINISH",sn:3,g:"FEMALE"},
+{d:"2/19/2026",dn:1,ms:"Aries",mp:"Waxing Crescent",cs:"FINISH",sn:3,g:"FEMALE"},
+{d:"2/20/2026",dn:2,ms:"Aries",mp:"Waxing Crescent",cs:"START",sn:1,g:"MALE"},
+{d:"2/21/2026",dn:3,ms:"Aries",mp:"Waxing Crescent",cs:"START",sn:1,g:"MALE"},
+{d:"2/22/2026",dn:4,ms:"Taurus",mp:"Waxing Crescent",cs:"MOVE",sn:2,g:"FEMALE"},
+{d:"2/23/2026",dn:5,ms:"Taurus",mp:"Waxing Crescent",cs:"MOVE",sn:2,g:"FEMALE"},
+{d:"2/24/2026",dn:6,ms:"Gemini",mp:"First Quarter",cs:"FINISH",sn:3,g:"MALE"},
+{d:"2/25/2026",dn:7,ms:"Gemini",mp:"Waxing Gibbous",cs:"FINISH",sn:3,g:"MALE"},
+{d:"2/26/2026",dn:8,ms:"Cancer",mp:"Waxing Gibbous",cs:"START",sn:1,g:"FEMALE"},
+{d:"2/27/2026",dn:9,ms:"Cancer",mp:"Waxing Gibbous",cs:"START",sn:1,g:"FEMALE"},
+{d:"2/28/2026",dn:1,ms:"Leo",mp:"Waxing Gibbous",cs:"MOVE",sn:2,g:"MALE"},
+{d:"3/1/2026",dn:1,ms:"Leo",mp:"Waxing Gibbous",cs:"MOVE",sn:2,g:"MALE"},
+{d:"3/2/2026",dn:2,ms:"Leo",mp:"Waxing Gibbous",cs:"MOVE",sn:2,g:"MALE"},
+{d:"3/3/2026",dn:3,ms:"Virgo",mp:"Full Moon",cs:"FINISH",sn:3,g:"FEMALE"},
+{d:"3/4/2026",dn:4,ms:"Virgo",mp:"Waning Gibbous",cs:"FINISH",sn:3,g:"FEMALE"},
+{d:"3/5/2026",dn:5,ms:"Libra",mp:"Waning Gibbous",cs:"START",sn:1,g:"MALE"},
+{d:"3/6/2026",dn:6,ms:"Libra",mp:"Waning Gibbous",cs:"START",sn:1,g:"MALE"},
+{d:"3/7/2026",dn:7,ms:"Scorpio",mp:"Waning Gibbous",cs:"MOVE",sn:2,g:"FEMALE"},
+{d:"3/8/2026",dn:8,ms:"Scorpio",mp:"Waning Gibbous",cs:"MOVE",sn:2,g:"FEMALE"},
+{d:"3/9/2026",dn:9,ms:"Scorpio",mp:"Waning Gibbous",cs:"MOVE",sn:2,g:"FEMALE"},
+{d:"3/10/2026",dn:1,ms:"Sagittarius",mp:"Waning Gibbous",cs:"FINISH",sn:3,g:"MALE"},
+{d:"3/11/2026",dn:2,ms:"Sagittarius",mp:"Last Quarter",cs:"FINISH",sn:3,g:"MALE"},
+{d:"3/12/2026",dn:3,ms:"Capricorn",mp:"Waning Crescent",cs:"START",sn:1,g:"FEMALE"},
+{d:"3/13/2026",dn:4,ms:"Capricorn",mp:"Waning Crescent",cs:"START",sn:1,g:"FEMALE"},
+{d:"3/14/2026",dn:5,ms:"Capricorn",mp:"Waning Crescent",cs:"START",sn:1,g:"FEMALE"},
+{d:"3/15/2026",dn:6,ms:"Aquarius",mp:"Waning Crescent",cs:"MOVE",sn:2,g:"MALE"},
+{d:"3/16/2026",dn:7,ms:"Aquarius",mp:"Waning Crescent",cs:"MOVE",sn:2,g:"MALE"},
+{d:"3/17/2026",dn:8,ms:"Pisces",mp:"Waning Crescent",cs:"FINISH",sn:3,g:"FEMALE"},
+{d:"3/18/2026",dn:9,ms:"Pisces",mp:"Waning Crescent",cs:"FINISH",sn:3,g:"FEMALE"},
+{d:"3/19/2026",dn:1,ms:"Aries",mp:"New Moon",cs:"START",sn:1,g:"MALE"},
+{d:"3/20/2026",dn:2,ms:"Aries",mp:"Waxing Crescent",cs:"START",sn:1,g:"MALE"},
+{d:"3/21/2026",dn:3,ms:"Taurus",mp:"Waxing Crescent",cs:"MOVE",sn:2,g:"FEMALE"},
+{d:"3/22/2026",dn:4,ms:"Taurus",mp:"Waxing Crescent",cs:"MOVE",sn:2,g:"FEMALE"},
+{d:"3/23/2026",dn:5,ms:"Gemini",mp:"Waxing Crescent",cs:"FINISH",sn:3,g:"MALE"},
+{d:"3/24/2026",dn:6,ms:"Gemini",mp:"Waxing Crescent",cs:"FINISH",sn:3,g:"MALE"},
+{d:"3/25/2026",dn:7,ms:"Cancer",mp:"First Quarter",cs:"START",sn:1,g:"FEMALE"},
+{d:"3/26/2026",dn:8,ms:"Cancer",mp:"Waxing Gibbous",cs:"START",sn:1,g:"FEMALE"},
+{d:"3/27/2026",dn:9,ms:"Cancer",mp:"Waxing Gibbous",cs:"START",sn:1,g:"FEMALE"},
+{d:"3/28/2026",dn:1,ms:"Leo",mp:"Waxing Gibbous",cs:"MOVE",sn:2,g:"MALE"},
+{d:"3/29/2026",dn:2,ms:"Leo",mp:"Waxing Gibbous",cs:"MOVE",sn:2,g:"MALE"},
+{d:"3/30/2026",dn:3,ms:"Virgo",mp:"Waxing Gibbous",cs:"FINISH",sn:3,g:"FEMALE"},
+{d:"3/31/2026",dn:4,ms:"Virgo",mp:"Waxing Gibbous",cs:"FINISH",sn:3,g:"FEMALE"},
+{d:"4/1/2026",dn:1,ms:"Libra",mp:"Waxing Gibbous",cs:"START",sn:1,g:"MALE"},
+{d:"4/2/2026",dn:2,ms:"Libra",mp:"Full Moon",cs:"START",sn:1,g:"MALE"},
+{d:"4/3/2026",dn:3,ms:"Libra",mp:"Waning Gibbous",cs:"START",sn:1,g:"MALE"},
+{d:"4/4/2026",dn:4,ms:"Scorpio",mp:"Waning Gibbous",cs:"MOVE",sn:2,g:"FEMALE"},
+{d:"4/5/2026",dn:5,ms:"Scorpio",mp:"Waning Gibbous",cs:"MOVE",sn:2,g:"FEMALE"},
+{d:"4/6/2026",dn:6,ms:"Sagittarius",mp:"Waning Gibbous",cs:"FINISH",sn:3,g:"MALE"},
+{d:"4/7/2026",dn:7,ms:"Sagittarius",mp:"Waning Gibbous",cs:"FINISH",sn:3,g:"MALE"},
+{d:"4/8/2026",dn:8,ms:"Sagittarius",mp:"Waning Gibbous",cs:"FINISH",sn:3,g:"MALE"},
+{d:"4/9/2026",dn:9,ms:"Capricorn",mp:"Waning Gibbous",cs:"START",sn:1,g:"FEMALE"},
+{d:"4/10/2026",dn:1,ms:"Capricorn",mp:"Last Quarter",cs:"START",sn:1,g:"FEMALE"},
+{d:"4/11/2026",dn:2,ms:"Aquarius",mp:"Waning Crescent",cs:"MOVE",sn:2,g:"MALE"},
+{d:"4/12/2026",dn:3,ms:"Aquarius",mp:"Waning Crescent",cs:"MOVE",sn:2,g:"MALE"},
+{d:"4/13/2026",dn:4,ms:"Pisces",mp:"Waning Crescent",cs:"FINISH",sn:3,g:"FEMALE"},
+{d:"4/14/2026",dn:5,ms:"Pisces",mp:"Waning Crescent",cs:"FINISH",sn:3,g:"FEMALE"},
+{d:"4/15/2026",dn:6,ms:"Aries",mp:"Waning Crescent",cs:"FINISH",sn:3,g:"FEMALE"},
+{d:"4/16/2026",dn:7,ms:"Aries",mp:"Waning Crescent",cs:"START",sn:1,g:"MALE"},
+{d:"4/17/2026",dn:8,ms:"Aries",mp:"New Moon",cs:"START",sn:1,g:"MALE"},
+{d:"4/18/2026",dn:9,ms:"Taurus",mp:"Waxing Crescent",cs:"MOVE",sn:2,g:"FEMALE"},
+{d:"4/19/2026",dn:1,ms:"Taurus",mp:"Waxing Crescent",cs:"MOVE",sn:2,g:"FEMALE"},
+{d:"4/20/2026",dn:2,ms:"Gemini",mp:"Waxing Crescent",cs:"FINISH",sn:3,g:"MALE"},
+{d:"4/21/2026",dn:3,ms:"Gemini",mp:"Waxing Crescent",cs:"FINISH",sn:3,g:"MALE"},
+{d:"4/22/2026",dn:4,ms:"Cancer",mp:"Waxing Crescent",cs:"START",sn:1,g:"FEMALE"},
+{d:"4/23/2026",dn:5,ms:"Cancer",mp:"Waxing Crescent",cs:"START",sn:1,g:"FEMALE"},
+{d:"4/24/2026",dn:6,ms:"Leo",mp:"First Quarter",cs:"MOVE",sn:2,g:"MALE"},
+{d:"4/25/2026",dn:7,ms:"Leo",mp:"Waxing Gibbous",cs:"MOVE",sn:2,g:"MALE"},
+{d:"4/26/2026",dn:8,ms:"Virgo",mp:"Waxing Gibbous",cs:"FINISH",sn:3,g:"FEMALE"},
+{d:"4/27/2026",dn:9,ms:"Virgo",mp:"Waxing Gibbous",cs:"FINISH",sn:3,g:"FEMALE"},
+{d:"4/28/2026",dn:1,ms:"Libra",mp:"Waxing Gibbous",cs:"START",sn:1,g:"MALE"},
+{d:"4/29/2026",dn:2,ms:"Libra",mp:"Waxing Gibbous",cs:"START",sn:1,g:"MALE"},
+{d:"4/30/2026",dn:3,ms:"Libra",mp:"Waxing Gibbous",cs:"START",sn:1,g:"MALE"},
+{d:"5/1/2026",dn:1,ms:"Scorpio",mp:"Full Moon",cs:"MOVE",sn:2,g:"FEMALE"},
+{d:"5/2/2026",dn:2,ms:"Scorpio",mp:"Waning Gibbous",cs:"MOVE",sn:2,g:"FEMALE"},
+{d:"5/3/2026",dn:3,ms:"Sagittarius",mp:"Waning Gibbous",cs:"FINISH",sn:3,g:"MALE"},
+{d:"5/4/2026",dn:4,ms:"Sagittarius",mp:"Waning Gibbous",cs:"FINISH",sn:3,g:"MALE"},
+{d:"5/5/2026",dn:5,ms:"Sagittarius",mp:"Waning Gibbous",cs:"FINISH",sn:3,g:"MALE"},
+{d:"5/6/2026",dn:6,ms:"Capricorn",mp:"Waning Gibbous",cs:"START",sn:1,g:"FEMALE"},
+{d:"5/7/2026",dn:7,ms:"Capricorn",mp:"Waning Gibbous",cs:"START",sn:1,g:"FEMALE"},
+{d:"5/8/2026",dn:8,ms:"Aquarius",mp:"Waning Gibbous",cs:"MOVE",sn:2,g:"MALE"},
+{d:"5/9/2026",dn:9,ms:"Aquarius",mp:"Last Quarter",cs:"MOVE",sn:2,g:"MALE"},
+{d:"5/10/2026",dn:1,ms:"Aquarius",mp:"Last Quarter",cs:"MOVE",sn:2,g:"MALE"},
+{d:"5/11/2026",dn:2,ms:"Pisces",mp:"Waning Crescent",cs:"FINISH",sn:3,g:"FEMALE"},
+{d:"5/12/2026",dn:3,ms:"Pisces",mp:"Waning Crescent",cs:"FINISH",sn:3,g:"FEMALE"},
+{d:"5/13/2026",dn:4,ms:"Aries",mp:"Waning Crescent",cs:"START",sn:1,g:"MALE"},
+{d:"5/14/2026",dn:5,ms:"Aries",mp:"Waning Crescent",cs:"START",sn:1,g:"MALE"},
+{d:"5/15/2026",dn:6,ms:"Taurus",mp:"Waning Crescent",cs:"MOVE",sn:2,g:"FEMALE"},
+{d:"5/16/2026",dn:7,ms:"Taurus",mp:"New Moon",cs:"MOVE",sn:2,g:"FEMALE"},
+{d:"5/17/2026",dn:8,ms:"Gemini",mp:"Waxing Crescent",cs:"FINISH",sn:3,g:"MALE"},
+{d:"5/18/2026",dn:9,ms:"Gemini",mp:"Waxing Crescent",cs:"FINISH",sn:3,g:"MALE"},
+{d:"5/19/2026",dn:1,ms:"Cancer",mp:"Waxing Crescent",cs:"START",sn:1,g:"FEMALE"},
+{d:"5/20/2026",dn:2,ms:"Cancer",mp:"Waxing Crescent",cs:"START",sn:1,g:"FEMALE"},
+{d:"5/21/2026",dn:3,ms:"Leo",mp:"Waxing Crescent",cs:"MOVE",sn:2,g:"MALE"},
+{d:"5/22/2026",dn:4,ms:"Leo",mp:"Waxing Crescent",cs:"MOVE",sn:2,g:"MALE"},
+{d:"5/23/2026",dn:5,ms:"Virgo",mp:"First Quarter",cs:"FINISH",sn:3,g:"FEMALE"},
+{d:"5/24/2026",dn:6,ms:"Virgo",mp:"Waxing Gibbous",cs:"FINISH",sn:3,g:"FEMALE"},
+{d:"5/25/2026",dn:7,ms:"Virgo",mp:"Waxing Gibbous",cs:"FINISH",sn:3,g:"FEMALE"},
+{d:"5/26/2026",dn:8,ms:"Libra",mp:"Waxing Gibbous",cs:"START",sn:1,g:"MALE"},
+{d:"5/27/2026",dn:9,ms:"Libra",mp:"Waxing Gibbous",cs:"START",sn:1,g:"MALE"},
+{d:"5/28/2026",dn:1,ms:"Scorpio",mp:"Waxing Gibbous",cs:"MOVE",sn:2,g:"FEMALE"},
+{d:"5/29/2026",dn:2,ms:"Scorpio",mp:"Waxing Gibbous",cs:"MOVE",sn:2,g:"FEMALE"},
+{d:"5/30/2026",dn:3,ms:"Scorpio",mp:"Waxing Gibbous",cs:"MOVE",sn:2,g:"FEMALE"},
+{d:"5/31/2026",dn:4,ms:"Sagittarius",mp:"Full Moon",cs:"FINISH",sn:3,g:"MALE"},
+{d:"6/1/2026",dn:1,ms:"Sagittarius",mp:"Waning Gibbous",cs:"FINISH",sn:3,g:"MALE"},
+{d:"6/2/2026",dn:2,ms:"Capricorn",mp:"Waning Gibbous",cs:"START",sn:1,g:"FEMALE"},
+{d:"6/3/2026",dn:3,ms:"Capricorn",mp:"Waning Gibbous",cs:"START",sn:1,g:"FEMALE"},
+{d:"6/4/2026",dn:4,ms:"Capricorn",mp:"Waning Gibbous",cs:"START",sn:1,g:"FEMALE"},
+{d:"6/5/2026",dn:5,ms:"Aquarius",mp:"Waning Gibbous",cs:"MOVE",sn:2,g:"MALE"},
+{d:"6/6/2026",dn:6,ms:"Aquarius",mp:"Waning Gibbous",cs:"MOVE",sn:2,g:"MALE"},
+{d:"6/7/2026",dn:7,ms:"Pisces",mp:"Waning Gibbous",cs:"FINISH",sn:3,g:"FEMALE"},
+{d:"6/8/2026",dn:8,ms:"Pisces",mp:"Last Quarter",cs:"FINISH",sn:3,g:"FEMALE"},
+{d:"6/9/2026",dn:9,ms:"Aries",mp:"Waning Crescent",cs:"START",sn:1,g:"MALE"},
+{d:"6/10/2026",dn:1,ms:"Aries",mp:"Waning Crescent",cs:"START",sn:1,g:"MALE"},
+{d:"6/11/2026",dn:2,ms:"Aries",mp:"Waning Crescent",cs:"START",sn:1,g:"MALE"},
+{d:"6/12/2026",dn:3,ms:"Taurus",mp:"Waning Crescent",cs:"MOVE",sn:2,g:"FEMALE"},
+{d:"6/13/2026",dn:4,ms:"Taurus",mp:"Waning Crescent",cs:"MOVE",sn:2,g:"FEMALE"},
+{d:"6/14/2026",dn:5,ms:"Gemini",mp:"Waning Crescent",cs:"FINISH",sn:3,g:"MALE"},
+{d:"6/15/2026",dn:6,ms:"Gemini",mp:"New Moon",cs:"FINISH",sn:3,g:"MALE"},
+{d:"6/16/2026",dn:7,ms:"Cancer",mp:"Waxing Crescent",cs:"START",sn:1,g:"FEMALE"},
+{d:"6/17/2026",dn:8,ms:"Cancer",mp:"Waxing Crescent",cs:"START",sn:1,g:"FEMALE"},
+{d:"6/18/2026",dn:9,ms:"Leo",mp:"Waxing Crescent",cs:"MOVE",sn:2,g:"MALE"},
+{d:"6/19/2026",dn:1,ms:"Leo",mp:"Waxing Crescent",cs:"MOVE",sn:2,g:"MALE"},
+{d:"6/20/2026",dn:2,ms:"Virgo",mp:"Waxing Crescent",cs:"FINISH",sn:3,g:"FEMALE"},
+{d:"6/21/2026",dn:3,ms:"Virgo",mp:"First Quarter",cs:"FINISH",sn:3,g:"FEMALE"},
+{d:"6/22/2026",dn:4,ms:"Libra",mp:"First Quarter",cs:"START",sn:1,g:"MALE"},
+{d:"6/23/2026",dn:5,ms:"Libra",mp:"Waxing Gibbous",cs:"START",sn:1,g:"MALE"},
+{d:"6/24/2026",dn:6,ms:"Scorpio",mp:"Waxing Gibbous",cs:"MOVE",sn:2,g:"FEMALE"},
+{d:"6/25/2026",dn:7,ms:"Scorpio",mp:"Waxing Gibbous",cs:"MOVE",sn:2,g:"FEMALE"},
+{d:"6/26/2026",dn:8,ms:"Scorpio",mp:"Waxing Gibbous",cs:"MOVE",sn:2,g:"FEMALE"},
+{d:"6/27/2026",dn:9,ms:"Sagittarius",mp:"Waxing Gibbous",cs:"FINISH",sn:3,g:"MALE"},
+{d:"6/28/2026",dn:1,ms:"Sagittarius",mp:"Waxing Gibbous",cs:"FINISH",sn:3,g:"MALE"},
+{d:"6/29/2026",dn:2,ms:"Capricorn",mp:"Full Moon",cs:"START",sn:1,g:"FEMALE"},
+{d:"6/30/2026",dn:3,ms:"Capricorn",mp:"Waning Gibbous",cs:"START",sn:1,g:"FEMALE"},
+{d:"7/1/2026",dn:1,ms:"Capricorn",mp:"Waning Gibbous",cs:"START",sn:1,g:"FEMALE"},
+{d:"7/2/2026",dn:2,ms:"Aquarius",mp:"Waning Gibbous",cs:"MOVE",sn:2,g:"MALE"},
+{d:"7/3/2026",dn:3,ms:"Aquarius",mp:"Waning Gibbous",cs:"MOVE",sn:2,g:"MALE"},
+{d:"7/4/2026",dn:4,ms:"Pisces",mp:"Waning Gibbous",cs:"FINISH",sn:3,g:"FEMALE"},
+{d:"7/5/2026",dn:5,ms:"Pisces",mp:"Waning Gibbous",cs:"FINISH",sn:3,g:"FEMALE"},
+{d:"7/6/2026",dn:6,ms:"Aries",mp:"Waning Gibbous",cs:"FINISH",sn:3,g:"FEMALE"},
+{d:"7/7/2026",dn:7,ms:"Aries",mp:"Last Quarter",cs:"START",sn:1,g:"MALE"},
+{d:"7/8/2026",dn:8,ms:"Aries",mp:"Waning Crescent",cs:"START",sn:1,g:"MALE"},
+{d:"7/9/2026",dn:9,ms:"Taurus",mp:"Waning Crescent",cs:"MOVE",sn:2,g:"FEMALE"},
+{d:"7/10/2026",dn:1,ms:"Taurus",mp:"Waning Crescent",cs:"MOVE",sn:2,g:"FEMALE"},
+{d:"7/11/2026",dn:2,ms:"Gemini",mp:"Waning Crescent",cs:"FINISH",sn:3,g:"MALE"},
+{d:"7/12/2026",dn:3,ms:"Gemini",mp:"Waning Crescent",cs:"FINISH",sn:3,g:"MALE"},
+{d:"7/13/2026",dn:4,ms:"Cancer",mp:"Waning Crescent",cs:"START",sn:1,g:"FEMALE"},
+{d:"7/14/2026",dn:5,ms:"Cancer",mp:"New Moon",cs:"START",sn:1,g:"FEMALE"},
+{d:"7/15/2026",dn:6,ms:"Leo",mp:"Waxing Crescent",cs:"MOVE",sn:2,g:"MALE"},
+{d:"7/16/2026",dn:7,ms:"Leo",mp:"Waxing Crescent",cs:"MOVE",sn:2,g:"MALE"},
+{d:"7/17/2026",dn:8,ms:"Virgo",mp:"Waxing Crescent",cs:"FINISH",sn:3,g:"FEMALE"},
+{d:"7/18/2026",dn:9,ms:"Virgo",mp:"Waxing Crescent",cs:"FINISH",sn:3,g:"FEMALE"},
+{d:"7/19/2026",dn:1,ms:"Libra",mp:"Waxing Crescent",cs:"START",sn:1,g:"MALE"},
+{d:"7/20/2026",dn:2,ms:"Libra",mp:"Waxing Crescent",cs:"START",sn:1,g:"MALE"},
+{d:"7/21/2026",dn:3,ms:"Libra",mp:"First Quarter",cs:"START",sn:1,g:"MALE"},
+{d:"7/22/2026",dn:4,ms:"Scorpio",mp:"Waxing Gibbous",cs:"MOVE",sn:2,g:"FEMALE"},
+{d:"7/23/2026",dn:5,ms:"Scorpio",mp:"Waxing Gibbous",cs:"MOVE",sn:2,g:"FEMALE"},
+{d:"7/24/2026",dn:6,ms:"Sagittarius",mp:"Waxing Gibbous",cs:"FINISH",sn:3,g:"MALE"},
+{d:"7/25/2026",dn:7,ms:"Sagittarius",mp:"Waxing Gibbous",cs:"FINISH",sn:3,g:"MALE"},
+{d:"7/26/2026",dn:8,ms:"Sagittarius",mp:"Waxing Gibbous",cs:"FINISH",sn:3,g:"MALE"},
+{d:"7/27/2026",dn:9,ms:"Capricorn",mp:"Waxing Gibbous",cs:"START",sn:1,g:"FEMALE"},
+{d:"7/28/2026",dn:1,ms:"Capricorn",mp:"Waxing Gibbous",cs:"START",sn:1,g:"FEMALE"},
+{d:"7/29/2026",dn:2,ms:"Aquarius",mp:"Full Moon",cs:"MOVE",sn:2,g:"MALE"},
+{d:"7/30/2026",dn:3,ms:"Aquarius",mp:"Waning Gibbous",cs:"MOVE",sn:2,g:"MALE"},
+{d:"7/31/2026",dn:4,ms:"Aquarius",mp:"Waning Gibbous",cs:"MOVE",sn:2,g:"MALE"},
+{d:"8/1/2026",dn:1,ms:"Pisces",mp:"Waning Gibbous",cs:"FINISH",sn:3,g:"FEMALE"},
+{d:"8/2/2026",dn:2,ms:"Aries",mp:"Waning Gibbous",cs:"FINISH",sn:3,g:"FEMALE"},
+{d:"8/3/2026",dn:3,ms:"Aries",mp:"Waning Gibbous",cs:"START",sn:1,g:"MALE"},
+{d:"8/4/2026",dn:4,ms:"Aries",mp:"Waning Gibbous",cs:"START",sn:1,g:"MALE"},
+{d:"8/5/2026",dn:5,ms:"Taurus",mp:"Waning Gibbous",cs:"MOVE",sn:2,g:"FEMALE"},
+{d:"8/6/2026",dn:6,ms:"Taurus",mp:"Last Quarter",cs:"MOVE",sn:2,g:"FEMALE"},
+{d:"8/7/2026",dn:7,ms:"Gemini",mp:"Waning Crescent",cs:"FINISH",sn:3,g:"MALE"},
+{d:"8/8/2026",dn:8,ms:"Gemini",mp:"Waning Crescent",cs:"FINISH",sn:3,g:"MALE"},
+{d:"8/9/2026",dn:9,ms:"Cancer",mp:"Waning Crescent",cs:"START",sn:1,g:"FEMALE"},
+{d:"8/10/2026",dn:1,ms:"Cancer",mp:"Waning Crescent",cs:"START",sn:1,g:"FEMALE"},
+{d:"8/11/2026",dn:2,ms:"Leo",mp:"Waning Crescent",cs:"MOVE",sn:2,g:"MALE"},
+{d:"8/12/2026",dn:3,ms:"Leo",mp:"New Moon",cs:"MOVE",sn:2,g:"MALE"},
+{d:"8/13/2026",dn:4,ms:"Virgo",mp:"Waxing Crescent",cs:"FINISH",sn:3,g:"FEMALE"},
+{d:"8/14/2026",dn:5,ms:"Virgo",mp:"Waxing Crescent",cs:"FINISH",sn:3,g:"FEMALE"},
+{d:"8/15/2026",dn:6,ms:"Virgo",mp:"Waxing Crescent",cs:"FINISH",sn:3,g:"FEMALE"},
+{d:"8/16/2026",dn:7,ms:"Libra",mp:"Waxing Crescent",cs:"START",sn:1,g:"MALE"},
+{d:"8/17/2026",dn:8,ms:"Libra",mp:"Waxing Crescent",cs:"START",sn:1,g:"MALE"},
+{d:"8/18/2026",dn:9,ms:"Scorpio",mp:"Waxing Crescent",cs:"MOVE",sn:2,g:"FEMALE"},
+{d:"8/19/2026",dn:1,ms:"Scorpio",mp:"First Quarter",cs:"MOVE",sn:2,g:"FEMALE"},
+{d:"8/20/2026",dn:2,ms:"Sagittarius",mp:"First Quarter",cs:"FINISH",sn:3,g:"MALE"},
+{d:"8/21/2026",dn:3,ms:"Sagittarius",mp:"Waxing Gibbous",cs:"FINISH",sn:3,g:"MALE"},
+{d:"8/22/2026",dn:4,ms:"Sagittarius",mp:"Waxing Gibbous",cs:"FINISH",sn:3,g:"MALE"},
+{d:"8/23/2026",dn:5,ms:"Capricorn",mp:"Waxing Gibbous",cs:"START",sn:1,g:"FEMALE"},
+{d:"8/24/2026",dn:6,ms:"Capricorn",mp:"Waxing Gibbous",cs:"START",sn:1,g:"FEMALE"},
+{d:"8/25/2026",dn:7,ms:"Aquarius",mp:"Waxing Gibbous",cs:"MOVE",sn:2,g:"MALE"},
+{d:"8/26/2026",dn:8,ms:"Aquarius",mp:"Waxing Gibbous",cs:"MOVE",sn:2,g:"MALE"},
+{d:"8/27/2026",dn:9,ms:"Aquarius",mp:"Waxing Gibbous",cs:"MOVE",sn:2,g:"MALE"},
+{d:"8/28/2026",dn:1,ms:"Pisces",mp:"Full Moon",cs:"FINISH",sn:3,g:"FEMALE"},
+{d:"8/29/2026",dn:2,ms:"Pisces",mp:"Waning Gibbous",cs:"FINISH",sn:3,g:"FEMALE"},
+{d:"8/30/2026",dn:3,ms:"Aries",mp:"Waning Gibbous",cs:"START",sn:1,g:"MALE"},
+{d:"8/31/2026",dn:4,ms:"Aries",mp:"Waning Gibbous",cs:"START",sn:1,g:"MALE"},
+{d:"9/1/2026",dn:1,ms:"Taurus",mp:"Waning Gibbous",cs:"MOVE",sn:2,g:"FEMALE"},
+{d:"9/2/2026",dn:2,ms:"Taurus",mp:"Waning Gibbous",cs:"MOVE",sn:2,g:"FEMALE"},
+{d:"9/3/2026",dn:3,ms:"Gemini",mp:"Waning Gibbous",cs:"FINISH",sn:3,g:"MALE"},
+{d:"9/4/2026",dn:4,ms:"Gemini",mp:"Last Quarter",cs:"FINISH",sn:3,g:"MALE"},
+{d:"9/5/2026",dn:5,ms:"Gemini",mp:"Waning Crescent",cs:"FINISH",sn:3,g:"MALE"},
+{d:"9/6/2026",dn:6,ms:"Cancer",mp:"Waning Crescent",cs:"START",sn:1,g:"FEMALE"},
+{d:"9/7/2026",dn:7,ms:"Cancer",mp:"Waning Crescent",cs:"START",sn:1,g:"FEMALE"},
+{d:"9/8/2026",dn:8,ms:"Leo",mp:"Waning Crescent",cs:"MOVE",sn:2,g:"MALE"},
+{d:"9/9/2026",dn:9,ms:"Leo",mp:"Waning Crescent",cs:"MOVE",sn:2,g:"MALE"},
+{d:"9/10/2026",dn:1,ms:"Virgo",mp:"Waning Crescent",cs:"FINISH",sn:3,g:"FEMALE"},
+{d:"9/11/2026",dn:2,ms:"Virgo",mp:"New Moon",cs:"FINISH",sn:3,g:"FEMALE"},
+{d:"9/12/2026",dn:3,ms:"Libra",mp:"Waxing Crescent",cs:"START",sn:1,g:"MALE"},
+{d:"9/13/2026",dn:4,ms:"Libra",mp:"Waxing Crescent",cs:"START",sn:1,g:"MALE"},
+{d:"9/14/2026",dn:5,ms:"Scorpio",mp:"Waxing Crescent",cs:"MOVE",sn:2,g:"FEMALE"},
+{d:"9/15/2026",dn:6,ms:"Scorpio",mp:"Waxing Crescent",cs:"MOVE",sn:2,g:"FEMALE"},
+{d:"9/16/2026",dn:7,ms:"Scorpio",mp:"Waxing Crescent",cs:"MOVE",sn:2,g:"FEMALE"},
+{d:"9/17/2026",dn:8,ms:"Sagittarius",mp:"Waxing Crescent",cs:"FINISH",sn:3,g:"MALE"},
+{d:"9/18/2026",dn:9,ms:"Sagittarius",mp:"First Quarter",cs:"FINISH",sn:3,g:"MALE"},
+{d:"9/19/2026",dn:1,ms:"Capricorn",mp:"First Quarter",cs:"START",sn:1,g:"FEMALE"},
+{d:"9/20/2026",dn:2,ms:"Capricorn",mp:"Waxing Gibbous",cs:"START",sn:1,g:"FEMALE"},
+{d:"9/21/2026",dn:3,ms:"Capricorn",mp:"Waxing Gibbous",cs:"START",sn:1,g:"FEMALE"},
+{d:"9/22/2026",dn:4,ms:"Aquarius",mp:"Waxing Gibbous",cs:"MOVE",sn:2,g:"MALE"},
+{d:"9/23/2026",dn:5,ms:"Aquarius",mp:"Waxing Gibbous",cs:"MOVE",sn:2,g:"MALE"},
+{d:"9/24/2026",dn:6,ms:"Pisces",mp:"Waxing Gibbous",cs:"FINISH",sn:3,g:"FEMALE"},
+{d:"9/25/2026",dn:7,ms:"Pisces",mp:"Waxing Gibbous",cs:"FINISH",sn:3,g:"FEMALE"},
+{d:"9/26/2026",dn:8,ms:"Aries",mp:"Full Moon",cs:"START",sn:1,g:"MALE"},
+{d:"9/27/2026",dn:9,ms:"Aries",mp:"Waning Gibbous",cs:"START",sn:1,g:"MALE"},
+{d:"9/28/2026",dn:1,ms:"Aries",mp:"Waning Gibbous",cs:"START",sn:1,g:"MALE"},
+{d:"9/29/2026",dn:2,ms:"Taurus",mp:"Waning Gibbous",cs:"MOVE",sn:2,g:"FEMALE"},
+{d:"9/30/2026",dn:3,ms:"Taurus",mp:"Waning Gibbous",cs:"MOVE",sn:2,g:"FEMALE"},
+{d:"10/1/2026",dn:1,ms:"Gemini",mp:"Waning Gibbous",cs:"FINISH",sn:3,g:"MALE"},
+{d:"10/2/2026",dn:2,ms:"Gemini",mp:"Waning Gibbous",cs:"FINISH",sn:3,g:"MALE"},
+{d:"10/3/2026",dn:3,ms:"Cancer",mp:"Last Quarter",cs:"START",sn:1,g:"FEMALE"},
+{d:"10/4/2026",dn:4,ms:"Cancer",mp:"Waning Crescent",cs:"START",sn:1,g:"FEMALE"},
+{d:"10/5/2026",dn:5,ms:"Leo",mp:"Waning Crescent",cs:"MOVE",sn:2,g:"MALE"},
+{d:"10/6/2026",dn:6,ms:"Leo",mp:"Waning Crescent",cs:"MOVE",sn:2,g:"MALE"},
+{d:"10/7/2026",dn:7,ms:"Virgo",mp:"Waning Crescent",cs:"FINISH",sn:3,g:"FEMALE"},
+{d:"10/8/2026",dn:8,ms:"Virgo",mp:"Waning Crescent",cs:"FINISH",sn:3,g:"FEMALE"},
+{d:"10/9/2026",dn:9,ms:"Libra",mp:"Waning Crescent",cs:"START",sn:1,g:"MALE"},
+{d:"10/10/2026",dn:1,ms:"Libra",mp:"New Moon",cs:"START",sn:1,g:"MALE"},
+{d:"10/11/2026",dn:2,ms:"Libra",mp:"Waxing Crescent",cs:"START",sn:1,g:"MALE"},
+{d:"10/12/2026",dn:3,ms:"Scorpio",mp:"Waxing Crescent",cs:"MOVE",sn:2,g:"FEMALE"},
+{d:"10/13/2026",dn:4,ms:"Scorpio",mp:"Waxing Crescent",cs:"MOVE",sn:2,g:"FEMALE"},
+{d:"10/14/2026",dn:5,ms:"Sagittarius",mp:"Waxing Crescent",cs:"FINISH",sn:3,g:"MALE"},
+{d:"10/15/2026",dn:6,ms:"Sagittarius",mp:"Waxing Crescent",cs:"FINISH",sn:3,g:"MALE"},
+{d:"10/16/2026",dn:7,ms:"Sagittarius",mp:"Waxing Crescent",cs:"FINISH",sn:3,g:"MALE"},
+{d:"10/17/2026",dn:8,ms:"Capricorn",mp:"Waxing Crescent",cs:"START",sn:1,g:"FEMALE"},
+{d:"10/18/2026",dn:9,ms:"Capricorn",mp:"First Quarter",cs:"START",sn:1,g:"FEMALE"},
+{d:"10/19/2026",dn:1,ms:"Aquarius",mp:"Waxing Gibbous",cs:"MOVE",sn:2,g:"MALE"},
+{d:"10/20/2026",dn:2,ms:"Aquarius",mp:"Waxing Gibbous",cs:"MOVE",sn:2,g:"MALE"},
+{d:"10/21/2026",dn:3,ms:"Aquarius",mp:"Waxing Gibbous",cs:"MOVE",sn:2,g:"MALE"},
+{d:"10/22/2026",dn:4,ms:"Pisces",mp:"Waxing Gibbous",cs:"FINISH",sn:3,g:"FEMALE"},
+{d:"10/23/2026",dn:5,ms:"Aries",mp:"Waxing Gibbous",cs:"FINISH",sn:3,g:"FEMALE"},
+{d:"10/24/2026",dn:6,ms:"Aries",mp:"Waxing Gibbous",cs:"START",sn:1,g:"MALE"},
+{d:"10/25/2026",dn:7,ms:"Aries",mp:"Waxing Gibbous",cs:"START",sn:1,g:"MALE"},
+{d:"10/26/2026",dn:8,ms:"Taurus",mp:"Full Moon",cs:"MOVE",sn:2,g:"FEMALE"},
+{d:"10/27/2026",dn:9,ms:"Taurus",mp:"Waning Gibbous",cs:"MOVE",sn:2,g:"FEMALE"},
+{d:"10/28/2026",dn:1,ms:"Gemini",mp:"Waning Gibbous",cs:"FINISH",sn:3,g:"MALE"},
+{d:"10/29/2026",dn:2,ms:"Gemini",mp:"Waning Gibbous",cs:"FINISH",sn:3,g:"MALE"},
+{d:"10/30/2026",dn:3,ms:"Cancer",mp:"Waning Gibbous",cs:"START",sn:1,g:"FEMALE"},
+{d:"10/31/2026",dn:4,ms:"Cancer",mp:"Waning Gibbous",cs:"START",sn:1,g:"FEMALE"},
+{d:"11/1/2026",dn:1,ms:"Leo",mp:"Last Quarter",cs:"MOVE",sn:2,g:"MALE"},
+{d:"11/2/2026",dn:2,ms:"Leo",mp:"Waning Crescent",cs:"MOVE",sn:2,g:"MALE"},
+{d:"11/3/2026",dn:3,ms:"Virgo",mp:"Waning Crescent",cs:"FINISH",sn:3,g:"FEMALE"},
+{d:"11/4/2026",dn:4,ms:"Virgo",mp:"Waning Crescent",cs:"FINISH",sn:3,g:"FEMALE"},
+{d:"11/5/2026",dn:5,ms:"Virgo",mp:"Waning Crescent",cs:"FINISH",sn:3,g:"FEMALE"},
+{d:"11/6/2026",dn:6,ms:"Libra",mp:"Waning Crescent",cs:"START",sn:1,g:"MALE"},
+{d:"11/7/2026",dn:7,ms:"Libra",mp:"Waning Crescent",cs:"START",sn:1,g:"MALE"},
+{d:"11/8/2026",dn:8,ms:"Scorpio",mp:"Waning Crescent",cs:"MOVE",sn:2,g:"FEMALE"},
+{d:"11/9/2026",dn:9,ms:"Scorpio",mp:"New Moon",cs:"MOVE",sn:2,g:"FEMALE"},
+{d:"11/10/2026",dn:1,ms:"Sagittarius",mp:"Waxing Crescent",cs:"FINISH",sn:3,g:"MALE"},
+{d:"11/11/2026",dn:2,ms:"Sagittarius",mp:"Waxing Crescent",cs:"FINISH",sn:3,g:"MALE"},
+{d:"11/12/2026",dn:3,ms:"Sagittarius",mp:"Waxing Crescent",cs:"FINISH",sn:3,g:"MALE"},
+{d:"11/13/2026",dn:4,ms:"Capricorn",mp:"Waxing Crescent",cs:"START",sn:1,g:"FEMALE"},
+{d:"11/14/2026",dn:5,ms:"Capricorn",mp:"Waxing Crescent",cs:"START",sn:1,g:"FEMALE"},
+{d:"11/15/2026",dn:6,ms:"Aquarius",mp:"Waxing Crescent",cs:"MOVE",sn:2,g:"MALE"},
+{d:"11/16/2026",dn:7,ms:"Aquarius",mp:"Waxing Crescent",cs:"MOVE",sn:2,g:"MALE"},
+{d:"11/17/2026",dn:8,ms:"Aquarius",mp:"First Quarter",cs:"MOVE",sn:2,g:"MALE"},
+{d:"11/18/2026",dn:9,ms:"Pisces",mp:"Waxing Gibbous",cs:"FINISH",sn:3,g:"FEMALE"},
+{d:"11/19/2026",dn:1,ms:"Pisces",mp:"Waxing Gibbous",cs:"FINISH",sn:3,g:"FEMALE"},
+{d:"11/20/2026",dn:2,ms:"Aries",mp:"Waxing Gibbous",cs:"START",sn:1,g:"MALE"},
+{d:"11/21/2026",dn:3,ms:"Aries",mp:"Waxing Gibbous",cs:"START",sn:1,g:"MALE"},
+{d:"11/22/2026",dn:4,ms:"Taurus",mp:"Waxing Gibbous",cs:"MOVE",sn:2,g:"FEMALE"},
+{d:"11/23/2026",dn:5,ms:"Taurus",mp:"Waxing Gibbous",cs:"MOVE",sn:2,g:"FEMALE"},
+{d:"11/24/2026",dn:6,ms:"Gemini",mp:"Full Moon",cs:"FINISH",sn:3,g:"MALE"},
+{d:"11/25/2026",dn:7,ms:"Gemini",mp:"Waning Gibbous",cs:"FINISH",sn:3,g:"MALE"},
+{d:"11/26/2026",dn:8,ms:"Cancer",mp:"Waning Gibbous",cs:"START",sn:1,g:"FEMALE"},
+{d:"11/27/2026",dn:9,ms:"Cancer",mp:"Waning Gibbous",cs:"START",sn:1,g:"FEMALE"},
+{d:"11/28/2026",dn:1,ms:"Leo",mp:"Waning Gibbous",cs:"MOVE",sn:2,g:"MALE"},
+{d:"11/29/2026",dn:2,ms:"Leo",mp:"Waning Gibbous",cs:"MOVE",sn:2,g:"MALE"},
+{d:"11/30/2026",dn:3,ms:"Leo",mp:"Waning Gibbous",cs:"MOVE",sn:2,g:"MALE"},
+{d:"12/1/2026",dn:1,ms:"Virgo",mp:"Last Quarter",cs:"FINISH",sn:3,g:"FEMALE"},
+{d:"12/2/2026",dn:2,ms:"Virgo",mp:"Waning Crescent",cs:"FINISH",sn:3,g:"FEMALE"},
+{d:"12/3/2026",dn:3,ms:"Libra",mp:"Waning Crescent",cs:"START",sn:1,g:"MALE"},
+{d:"12/4/2026",dn:4,ms:"Libra",mp:"Waning Crescent",cs:"START",sn:1,g:"MALE"},
+{d:"12/5/2026",dn:5,ms:"Scorpio",mp:"Waning Crescent",cs:"MOVE",sn:2,g:"FEMALE"},
+{d:"12/6/2026",dn:6,ms:"Scorpio",mp:"Waning Crescent",cs:"MOVE",sn:2,g:"FEMALE"},
+{d:"12/7/2026",dn:7,ms:"Scorpio",mp:"Waning Crescent",cs:"MOVE",sn:2,g:"FEMALE"},
+{d:"12/8/2026",dn:8,ms:"Sagittarius",mp:"Waning Crescent",cs:"FINISH",sn:3,g:"MALE"},
+{d:"12/9/2026",dn:9,ms:"Sagittarius",mp:"New Moon",cs:"FINISH",sn:3,g:"MALE"},
+{d:"12/10/2026",dn:1,ms:"Capricorn",mp:"Waxing Crescent",cs:"START",sn:1,g:"FEMALE"},
+{d:"12/11/2026",dn:2,ms:"Capricorn",mp:"Waxing Crescent",cs:"START",sn:1,g:"FEMALE"},
+{d:"12/12/2026",dn:3,ms:"Capricorn",mp:"Waxing Crescent",cs:"START",sn:1,g:"FEMALE"},
+{d:"12/13/2026",dn:4,ms:"Aquarius",mp:"Waxing Crescent",cs:"MOVE",sn:2,g:"MALE"},
+{d:"12/14/2026",dn:5,ms:"Aquarius",mp:"Waxing Crescent",cs:"MOVE",sn:2,g:"MALE"},
+{d:"12/15/2026",dn:6,ms:"Pisces",mp:"Waxing Crescent",cs:"FINISH",sn:3,g:"FEMALE"},
+{d:"12/16/2026",dn:7,ms:"Pisces",mp:"Waxing Crescent",cs:"FINISH",sn:3,g:"FEMALE"},
+{d:"12/17/2026",dn:8,ms:"Aries",mp:"First Quarter",cs:"FINISH",sn:3,g:"FEMALE"},
+{d:"12/18/2026",dn:9,ms:"Aries",mp:"Waxing Gibbous",cs:"START",sn:1,g:"MALE"},
+{d:"12/19/2026",dn:1,ms:"Aries",mp:"Waxing Gibbous",cs:"START",sn:1,g:"MALE"},
+{d:"12/20/2026",dn:2,ms:"Taurus",mp:"Waxing Gibbous",cs:"MOVE",sn:2,g:"FEMALE"},
+{d:"12/21/2026",dn:3,ms:"Taurus",mp:"Waxing Gibbous",cs:"MOVE",sn:2,g:"FEMALE"},
+{d:"12/22/2026",dn:4,ms:"Gemini",mp:"Waxing Gibbous",cs:"FINISH",sn:3,g:"MALE"},
+{d:"12/23/2026",dn:5,ms:"Gemini",mp:"Waxing Gibbous",cs:"FINISH",sn:3,g:"MALE"},
+{d:"12/24/2026",dn:6,ms:"Cancer",mp:"Full Moon",cs:"START",sn:1,g:"FEMALE"},
+{d:"12/25/2026",dn:7,ms:"Cancer",mp:"Waning Gibbous",cs:"START",sn:1,g:"FEMALE"},
+{d:"12/26/2026",dn:8,ms:"Leo",mp:"Waning Gibbous",cs:"MOVE",sn:2,g:"MALE"},
+{d:"12/27/2026",dn:9,ms:"Leo",mp:"Waning Gibbous",cs:"MOVE",sn:2,g:"MALE"},
+{d:"12/28/2026",dn:1,ms:"Virgo",mp:"Waning Gibbous",cs:"FINISH",sn:3,g:"FEMALE"},
+{d:"12/29/2026",dn:2,ms:"Virgo",mp:"Waning Gibbous",cs:"FINISH",sn:3,g:"FEMALE"},
+{d:"12/30/2026",dn:3,ms:"Libra",mp:"Last Quarter",cs:"START",sn:1,g:"MALE"},
+{d:"12/31/2026",dn:4,ms:"Libra",mp:"Waning Crescent",cs:"START",sn:1,g:"MALE"}
+];
+
+// TRANSIT DATA
+const RETRO_DB=[{e:'Chiron Direct',d:'1/2/2026'},{e:'Uranus Direct',d:'2/4/2026'},{e:'Mercury Retrograde',d:'2/26/2026'},{e:'Jupiter Direct',d:'3/11/2026'},{e:'Mercury Direct',d:'3/20/2026'},{e:'Pluto Retrograde',d:'5/6/2026'},{e:'Mercury Retrograde',d:'6/29/2026'},{e:'Neptune Retrograde',d:'7/7/2026'},{e:'Mercury Direct',d:'7/23/2026'},{e:'Saturn Retrograde',d:'7/26/2026'},{e:'Chiron Retrograde',d:'8/3/2026'},{e:'Uranus Retrograde',d:'9/10/2026'},{e:'Venus Retrograde',d:'10/3/2026'},{e:'Pluto Direct',d:'10/16/2026'},{e:'Mercury Retrograde',d:'10/24/2026'},{e:'Mercury Direct',d:'11/13/2026'},{e:'Venus Direct',d:'11/14/2026'},{e:'Saturn Direct',d:'12/10/2026'},{e:'Neptune Direct',d:'12/12/2026'},{e:'Jupiter Retrograde',d:'12/13/2026'}];
+const MOON_DB2=[{e:'Full Moon',d:'1/3/2026'},{e:'New Moon',d:'1/18/2026'},{e:'Full Moon',d:'2/1/2026'},{e:'New Moon',d:'2/17/2026'},{e:'Solar Eclipse',d:'2/17/2026'},{e:'Lunar Eclipse',d:'3/3/2026'},{e:'Full Moon',d:'3/3/2026'},{e:'New Moon',d:'3/19/2026'},{e:'Full Moon',d:'4/2/2026'},{e:'New Moon',d:'4/17/2026'},{e:'Full Moon',d:'5/1/2026'},{e:'New Moon',d:'5/16/2026'},{e:'Full Moon',d:'5/31/2026'},{e:'New Moon',d:'6/15/2026'},{e:'Full Moon',d:'6/29/2026'},{e:'New Moon',d:'7/14/2026'},{e:'Full Moon',d:'7/29/2026'},{e:'New Moon',d:'8/12/2026'},{e:'Solar Eclipse',d:'8/12/2026'},{e:'Lunar Eclipse',d:'8/28/2026'},{e:'Full Moon',d:'8/28/2026'},{e:'New Moon',d:'9/11/2026'},{e:'Full Moon',d:'9/26/2026'},{e:'New Moon',d:'10/10/2026'},{e:'Full Moon',d:'10/26/2026'},{e:'New Moon',d:'11/9/2026'},{e:'Full Moon',d:'11/24/2026'},{e:'New Moon',d:'12/9/2026'},{e:'Full Moon',d:'12/24/2026'}];
+const INGRESS_DB=[{e:'Mercury enters Capricorn',d:'1/1/2026'},{e:'Venus enters Aquarius',d:'1/17/2026'},{e:'Sun enters Aquarius',d:'1/20/2026'},{e:'Mercury enters Aquarius',d:'1/20/2026'},{e:'Mars enters Aquarius',d:'1/23/2026'},{e:'Neptune enters Aries',d:'1/26/2026'},{e:'Mercury enters Pisces',d:'2/6/2026'},{e:'Venus enters Pisces',d:'2/10/2026'},{e:'Saturn enters Aries',d:'2/14/2026'},{e:'Sun enters Pisces',d:'2/18/2026'},{e:'Mars enters Pisces',d:'3/2/2026'},{e:'Venus enters Aries',d:'3/6/2026'},{e:'Sun enters Aries',d:'3/20/2026'},{e:'Venus enters Taurus',d:'3/30/2026'},{e:'Mars enters Aries',d:'4/9/2026'},{e:'Mercury enters Aries',d:'4/15/2026'},{e:'Sun enters Taurus',d:'4/20/2026'},{e:'Venus enters Gemini',d:'4/24/2026'},{e:'Uranus enters Gemini',d:'4/26/2026'},{e:'Mercury enters Taurus',d:'5/3/2026'},{e:'Mercury enters Gemini',d:'5/17/2026'},{e:'Mars enters Taurus',d:'5/18/2026'},{e:'Venus enters Cancer',d:'5/19/2026'},{e:'Sun enters Gemini',d:'5/21/2026'},{e:'Mercury enters Cancer',d:'6/1/2026'},{e:'Venus enters Leo',d:'6/13/2026'},{e:'Chiron enters Taurus',d:'6/19/2026'},{e:'Sun enters Cancer',d:'6/21/2026'},{e:'Mars enters Gemini',d:'6/28/2026'},{e:'Jupiter enters Leo',d:'6/30/2026'},{e:'Venus enters Virgo',d:'7/9/2026'},{e:'Sun enters Leo',d:'7/22/2026'},{e:'Venus enters Libra',d:'8/6/2026'},{e:'Mercury enters Leo',d:'8/9/2026'},{e:'Mars enters Cancer',d:'8/11/2026'},{e:'Sun enters Virgo',d:'8/23/2026'},{e:'Mercury enters Virgo',d:'8/25/2026'},{e:'Venus enters Scorpio',d:'9/10/2026'},{e:'Mercury enters Libra',d:'9/10/2026'},{e:'Sun enters Libra',d:'9/23/2026'},{e:'Mars enters Leo',d:'9/28/2026'},{e:'Mercury enters Scorpio',d:'9/30/2026'},{e:'Sun enters Scorpio',d:'10/23/2026'},{e:'Sun enters Sagittarius',d:'11/22/2026'},{e:'Mars enters Virgo',d:'11/25/2026'},{e:'Venus enters Scorpio',d:'12/4/2026'},{e:'Mercury enters Sagittarius',d:'12/6/2026'},{e:'Sun enters Capricorn',d:'12/21/2026'},{e:'Mercury enters Capricorn',d:'12/25/2026'}];
+const ASPECT_DB=[{e:'Sun Conjunction Venus',d:'1/6/2026'},{e:'Sun Conjunction Mars',d:'1/9/2026'},{e:'Sun Conjunction Mercury',d:'1/21/2026'},{e:'Sun Conjunction Pluto',d:'1/23/2026'},{e:'Sun Conjunction Node',d:'2/27/2026'},{e:'Sun Conjunction Mercury',d:'3/7/2026'},{e:'Sun Conjunction Neptune',d:'3/22/2026'},{e:'Sun Conjunction Saturn',d:'3/25/2026'},{e:'Sun Conjunction Chiron',d:'4/16/2026'},{e:'Sun Conjunction Mercury',d:'5/14/2026'},{e:'Sun Conjunction Uranus',d:'5/22/2026'},{e:'Sun Conjunction Mercury',d:'7/13/2026'},{e:'Sun Conjunction Jupiter',d:'7/29/2026'},{e:'Sun Conjunction Mercury',d:'8/27/2026'},{e:'Sun Conjunction Venus',d:'10/24/2026'},{e:'Sun Conjunction Mercury',d:'11/4/2026'}];
+const SUN_DB=[{e:'Sun enters Aquarius',d:'1/20/2026'},{e:'Sun enters Pisces',d:'2/18/2026'},{e:'Sun enters Aries',d:'3/20/2026'},{e:'Sun enters Taurus',d:'4/20/2026'},{e:'Sun enters Gemini',d:'5/21/2026'},{e:'Sun enters Cancer',d:'6/21/2026'},{e:'Sun enters Leo',d:'7/22/2026'},{e:'Sun enters Virgo',d:'8/23/2026'},{e:'Sun enters Libra',d:'9/23/2026'},{e:'Sun enters Scorpio',d:'10/23/2026'},{e:'Sun enters Sagittarius',d:'11/22/2026'},{e:'Sun enters Capricorn',d:'12/21/2026'}];
+
+// ZODIAC DATA
+const ZODIAC_DB={
+  Aries:    {gender:'MALE',  nature:'MOVABLE',  keyword:'START',  bias:'BREAKOUT',     stageNum:1},
+  Taurus:   {gender:'FEMALE',nature:'FIXED',    keyword:'BUILD',  bias:'ACCUMULATION', stageNum:2},
+  Gemini:   {gender:'MALE',  nature:'FINISHER', keyword:'MOVE',   bias:'VOLATILE',     stageNum:3},
+  Cancer:   {gender:'FEMALE',nature:'MOVABLE',  keyword:'START',  bias:'EMOTIONAL',    stageNum:1},
+  Leo:      {gender:'MALE',  nature:'FIXED',    keyword:'BUILD',  bias:'TREND',        stageNum:2},
+  Virgo:    {gender:'FEMALE',nature:'FINISHER', keyword:'FINISH', bias:'REVERSAL',     stageNum:3},
+  Libra:    {gender:'MALE',  nature:'MOVABLE',  keyword:'START',  bias:'RANGE',        stageNum:1},
+  Scorpio:  {gender:'FEMALE',nature:'FIXED',    keyword:'BUILD',  bias:'SHARP MOVE',   stageNum:2},
+  Sagittarius:{gender:'MALE',nature:'FINISHER', keyword:'FINISH', bias:'EXPANSION',    stageNum:3},
+  Capricorn:{gender:'FEMALE',nature:'MOVABLE',  keyword:'START',  bias:'TREND',        stageNum:1},
+  Aquarius: {gender:'MALE',  nature:'FIXED',    keyword:'BUILD',  bias:'UNEXPECTED',   stageNum:2},
+  Pisces:   {gender:'FEMALE',nature:'FINISHER', keyword:'FINISH', bias:'EXHAUSTION',   stageNum:3}
+};
+
+// GOOGLE SHEET URL
+const SHEET_DAILY = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vTiPz1yT2UGgyYoS7jGP3sahf7-jOW_p_ljYoBcxXEoxDQDYLywjf5Tes4pMNdXGh8Tjiy8rfR7RsEV/pub?output=csv';
+
+// ?? CORS PROXY FETCH - multi-proxy with fallback chain ??
+// ?? YOUR PERSONAL GOOGLE APPS SCRIPT PROXY ??
+// This is your own proxy - always works from any device
+const GAS_PROXY = 'https://script.google.com/macros/s/AKfycbyOIsxhuixfFZKppKmP3ekr4Zj2MiIPwDFYAKLhLmwcZwgXM7z58S8pbzKEUtLmzdNX4A/exec';
+
+const PROXIES = [
+  // 1. Your Google Apps Script (most reliable - works everywhere)
+  u => GAS_PROXY + '?url=' + encodeURIComponent(u),
+  // 2. Direct (works on localhost only)
+  u => u + '&t=' + Date.now(),
+  // 3. Fallback proxies
+  u => 'https://api.allorigins.win/raw?url=' + encodeURIComponent(u),
+  u => 'https://corsproxy.io/?' + encodeURIComponent(u),
+  u => 'https://api.codetabs.com/v1/proxy?quest=' + encodeURIComponent(u),
+];
+
+// For GitHub Pages - try each proxy with longer timeout
+async function proxyFetchGH(url) {
+  const errors = [];
+  // On GitHub Pages, skip direct fetch (will fail due to CORS)
+  const startIdx = 0; // Always try GAS proxy first - works everywhere
+  for (let i = startIdx; i < PROXIES.length; i++) {
+    try {
+      const proxyUrl = PROXIES[i](url);
+      const ctrl = new AbortController();
+      const timer = setTimeout(() => ctrl.abort(), 12000);
+      const r = await fetch(proxyUrl, {
+        cache: 'no-store',
+        signal: ctrl.signal,
+        headers: IS_SERVER ? {} : {'X-Requested-With': 'XMLHttpRequest'}
+      });
+      clearTimeout(timer);
+      if (!r.ok) throw new Error('HTTP ' + r.status);
+      const text = await r.text();
+      if (text && text.length > 30 && text.includes(',')) {
+        console.log('? Proxy', i, 'worked');
+        return text;
+      }
+      throw new Error('Bad response: ' + text.slice(0,50));
+    } catch(e) {
+      errors.push('P' + i + ':' + e.message.slice(0,25));
+      await new Promise(r => setTimeout(r, 400));
+    }
+  }
+  throw new Error('All proxies failed: ' + errors.join(' | '));
+}
+
+// Use different starting proxy for each sheet to avoid rate limits
+async function proxyFetchWithOffset(url, startIdx=0) {
+  return proxyFetchGH(url);
+}
+
+async function proxyFetch(url) {
+  return proxyFetchGH(url);
+}
+async function _proxyFetch_unused(url) {
+  const errors = [];
+  for (let i = 0; i < PROXIES.length; i++) {
+    try {
+      const proxyUrl = PROXIES[i](url);
+      const ctrl = new AbortController();
+      const timer = setTimeout(() => ctrl.abort(), 8000); // 8s timeout per proxy
+      const r = await fetch(proxyUrl, {cache:'no-store', signal: ctrl.signal});
+      clearTimeout(timer);
+      if (!r.ok) throw new Error('HTTP ' + r.status);
+      const text = await r.text();
+      // Validate: must look like CSV (has commas and newlines)
+      if (text.length > 30 && (text.includes(',') || text.includes('\n'))) {
+        console.log('? Proxy', i, 'worked for', url.slice(0,60));
+        return text;
+      }
+      throw new Error('Response too short or not CSV: ' + text.slice(0,50));
+    } catch(e) {
+      errors.push('Proxy ' + i + ': ' + e.message.slice(0,40));
+      // Small delay between proxy attempts
+      if (i < PROXIES.length - 1) await new Promise(r => setTimeout(r, 300));
+    }
+  }
+  throw new Error('All ' + PROXIES.length + ' proxies failed. Errors: ' + errors.join(' | '));
+}
+const SHEET_1H    = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vS5BHmyPLmpLP36ghEHnRx7ODq8q81C7EQCnaN1fuXxF0PmK28_qhSpvSu9SUMNt-fbLcUwU8a9ifTk/pub?output=csv';
+const SHEET_4H    = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vSAzvqkojMT7Tgo3AhBtg6qIISCicXeVFDmDOi7ACIEnhvLv4YdyBTIm52DNw4TRXGQS5CV3L8PObTJ/pub?output=csv';
+
+// ======================================================
+// STATE
+// ======================================================
+let P = {price:0,open:0,high:0,low:0,prevClose:0,bid:0,ask:0,ch:0,chp:0};
+let YEST = {open:0,high:0,low:0,close:0,date:'',dir:''}; // yesterday from Google Sheet
+let TODAY_ASTRO = null;
+let activeTr = 'BULL-BUY';
+let cdTimer = null, cdown = 0;
+let sheetData = [];
+let DATA_1H = [], DATA_4H = [];
+let TODAY_OPEN=0,TODAY_HIGH=0,TODAY_LOW=0,TODAY_CLOSE=0,TODAY_DIR='-',TODAY_TREND='-';
+let MTF = {
+  daily:{dir:'-',trend:'-'},
+  h4:{dir:'-',trend:'-',candles:[],swingHigh:0,swingLow:0},
+  h1:{dir:'-',trend:'-',candles:[],swingHigh:0,swingLow:0}
+};
+
+const $ = id => document.getElementById(id);
+const f1 = n => isNaN(+n)?'-':(+n).toFixed(1);
+const f2 = n => isNaN(+n)?'-':(+n).toFixed(2);
+const fp = (n,d=1) => (+n>=0?'+':'')+Number(n).toFixed(d);
+const gn = id => parseFloat($(id)?.value)||0;
+
+// ======================================================
+// DATE UTILS
+// ======================================================
+function todayStr() {
+  const n = new Date();
+  return `${n.getMonth()+1}/${n.getDate()}/${n.getFullYear()}`;
+}
+function dateToStr(d) {
+  return `${d.getMonth()+1}/${d.getDate()}/${d.getFullYear()}`;
+}
+function parseDate(s) {
+  const p = s.split('/');
+  if(p.length===3) return new Date(+p[2],+p[0]-1,+p[1]);
+  return null;
+}
+function daysDiff(d1,d2) {
+  return Math.round((d2-d1)/(1000*60*60*24));
+}
+
+// ======================================================
+// GOOGLE SHEET FETCH (yesterday's OHLC + data)
+// ======================================================
+// ?? SHARED CSV PARSER - handles quotes, \r\n, BOM ??
+function parseCSV(text){
+  // Remove BOM and normalize line endings
+  text = text.replace(/^\uFEFF/,'').replace(/\r\n/g,'\n').replace(/\r/g,'\n');
+  const lines = text.trim().split('\n');
+  if(lines.length<2) return [];
+  // Parse header - normalize keys
+  const hdr = lines[0].split(',').map(c=>c.replace(/"/g,'').trim());
+  return lines.slice(1).filter(l=>l.trim()).map(l=>{
+    // Handle quoted fields with commas inside
+    const cols=[];let cur='',inQ=false;
+    for(let i=0;i<l.length;i++){
+      if(l[i]==='"'){inQ=!inQ;}
+      else if(l[i]===','&&!inQ){cols.push(cur.trim());cur='';}
+      else cur+=l[i];
+    }
+    cols.push(cur.trim());
+    const obj={};
+    hdr.forEach((h,i)=>{ obj[h]=(cols[i]||'').replace(/"/g,'').trim(); });
+    return obj;
+  });
+}
+
+// ?? DAILY SHEET FETCH ??
+async function fetchDailySheet(){
+  try{
+    const raw=await proxyFetchWithOffset(SHEET_DAILY, 0); // Daily: start proxy 0
+    const rows=parseCSV(raw);
+    console.log('Daily rows:', rows.length, 'Keys:', Object.keys(rows[0]||{}));
+
+    // Find all rows with valid price data (Close > 100)
+    const valid=rows.filter(r=>{
+      const vals=Object.values(r);
+      // Try named columns first, then positional
+      const c=r.Close||r.close||r.CLOSE||(vals[4]||'');
+      return +c>100;
+    });
+    if(!valid.length) throw new Error('No valid rows');
+
+    // ALWAYS use the absolute last valid row = most recent trading day
+    const last=valid[valid.length-1];
+    const vals=Object.values(last);
+
+    // Extract with flexible column detection
+    const gv=(...keys)=>{
+      for(const k of keys){ const v=last[k]; if(v&&+v>100) return +v; }
+      return 0;
+    };
+    const gs2=(...keys)=>{
+      for(const k of keys){ const v=last[k]; if(v&&v.trim()) return v.trim(); }
+      return '';
+    };
+
+    YEST.open  = gv('Open','open','OPEN')   || +vals[1]||0;
+    YEST.high  = gv('High','high','HIGH')   || +vals[2]||0;
+    YEST.low   = gv('Low','low','LOW')      || +vals[3]||0;
+    YEST.close = gv('Close','close','CLOSE')|| +vals[4]||0;
+    YEST.date  = gs2('Date','date','DATE')  || vals[0]||'';
+    YEST.dir   = gs2('Direction','direction','Dir','G','H')|| vals[7]||vals[6]||'';
+
+    console.log('YEST:', JSON.stringify(YEST));
+    
+    if(!YEST.close||YEST.close<100) throw new Error('Invalid close: '+YEST.close);
+    BT_DAILY_ROWS=valid; // store for backtest
+    
+    updateYestDisplay();
+    $('gs-status').textContent='Sheet: ? '+YEST.date;
+    $('gs-status').style.color='var(--green)';
+    if(P.price>0) recalc(); // update pivots immediately
+    return true;
+  }catch(e){
+    console.error('Daily error:',e);
+    $('gs-status').textContent='Daily: ? '+e.message.slice(0,25);
+    $('gs-status').style.color='var(--red)';
+    return false;
+  }
+}
+
+// ?? 1H SHEET FETCH ??
+async function fetch1HSheet(){
+  try{
+    const raw=await proxyFetchWithOffset(SHEET_1H, 2); // 1H: start proxy 2
+    const allRows=parseCSV(raw);
+    console.log('1H rows:', allRows.length, 'Keys:', Object.keys(allRows[0]||{}));
+    // Flexible: find rows where Close > 100
+    const rows=allRows.filter(r=>{
+      const c=r.Close||r.close||Object.values(r)[4];
+      return c&&+c>100;
+    });
+    if(!rows.length) throw new Error('No 1H data');
+    DATA_1H=rows;
+
+    // Normalize column access
+    const getCol=(row,...keys)=>{
+      for(const k of keys){if(row[k]!==undefined&&row[k]!=='')return row[k];}
+      return '';
+    };
+
+    // Try both local date AND UTC date to handle timezone differences
+    const now=new Date();
+    // Local date (Dubai UTC+4)
+    const localPrefix=`${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}`;
+    // UTC date
+    const utcPrefix=`${now.getUTCFullYear()}-${String(now.getUTCMonth()+1).padStart(2,'0')}-${String(now.getUTCDate()).padStart(2,'0')}`;
+    // Use whichever finds more candles
+    const todayPrefixLocal = localPrefix;
+    const todayPrefixUTC   = utcPrefix;
+    console.log('1H looking for today: local='+localPrefix+' utc='+utcPrefix);
+    // Try local first
+    const todayPrefix = localPrefix;
+    // Try local date first, fall back to UTC date
+    let todayRows=rows.filter(r=>{
+      const dt=getCol(r,'DateTime','datetime','Date','date')||Object.values(r)[0]||'';
+      return dt.startsWith(todayPrefixLocal);
+    });
+    // If no candles found with local date, try UTC date
+    if(todayRows.length===0 && todayPrefixUTC !== todayPrefixLocal){
+      console.log('No candles with local date, trying UTC:', todayPrefixUTC);
+      todayRows=rows.filter(r=>{
+        const dt=getCol(r,'DateTime','datetime','Date','date')||Object.values(r)[0]||'';
+        return dt.startsWith(todayPrefixUTC);
+      });
+    }
+    // If still nothing, use last 24 candles as today
+    if(todayRows.length===0){
+      console.log('No today candles found, using last 24 rows');
+      todayRows=rows.slice(-24);
+    }
+    console.log('Today candles found:', todayRows.length);
+
+    if(todayRows.length>0){
+      // OPEN = first candle open (fixed for the day)
+      // Sort today rows by datetime to get earliest candle as open
+      const sortedRows=[...todayRows].sort((a,b)=>{
+        const da=getCol(a,'DateTime','datetime')||Object.values(a)[0]||'';
+        const db=getCol(b,'DateTime','datetime')||Object.values(b)[0]||'';
+        return da.localeCompare(db);
+      });
+      TODAY_OPEN = +getCol(sortedRows[0],'Open','open') || +Object.values(sortedRows[0])[1] || 0;
+      // HIGH = highest High seen today so far (running - updates each refresh)
+      const allH=todayRows.map(r=>+(getCol(r,'High','high')||Object.values(r)[2])||0).filter(v=>v>0);
+      TODAY_HIGH = allH.length ? Math.max(...allH) : 0;
+      // LOW = lowest Low seen today so far (running - updates each refresh)
+      const allL=todayRows.map(r=>+(getCol(r,'Low','low')||Object.values(r)[3])||0).filter(v=>v>0);
+      TODAY_LOW  = allL.length ? Math.min(...allL) : 0;
+      const lastR=todayRows[todayRows.length-1];
+      TODAY_CLOSE=+(getCol(lastR,'Close','close')||Object.values(lastR)[4])||0;
+      TODAY_DIR  =getCol(lastR,'Direction','direction')||'-';
+      TODAY_TREND=getCol(lastR,'Trend','trend')||'-';
+      // Find the time each extreme occurred
+      const hiIdx=allH.indexOf(TODAY_HIGH);
+      const loIdx=allL.indexOf(TODAY_LOW);
+      const hiDT=hiIdx>=0?(getCol(todayRows[hiIdx],'DateTime','datetime')||''):'';
+      const loDT=loIdx>=0?(getCol(todayRows[loIdx],'DateTime','datetime')||''):'';
+      const hiT=hiDT.length>10?hiDT.slice(11,16):'';
+      const loT=loDT.length>10?loDT.slice(11,16):'';
+      // Update price strip - ONLY 1H sets open/high/low, never live price
+      $('p-o').textContent=f2(TODAY_OPEN);
+      $('p-h').textContent=TODAY_HIGH?f2(TODAY_HIGH):'-';
+      $('p-l').textContent=TODAY_LOW?f2(TODAY_LOW):'-';
+      if($('p-h-time'))$('p-h-time').textContent=hiT?'at '+hiT:todayRows.length+' candles';
+      if($('p-l-time'))$('p-l-time').textContent=loT?'at '+loT:todayRows.length+' candles';
+      // Auto-set price from latest 1H close if no live price yet
+      if(TODAY_CLOSE>0 && !P.price){
+        setP(TODAY_CLOSE, TODAY_OPEN, TODAY_HIGH, TODAY_LOW,
+          YEST.close||TODAY_OPEN, 0, 0);
+      } else if(P.price>0){
+        // Price already set - just refresh open/high/low from 1H data
+        P.open = TODAY_OPEN || P.open;
+        P.high = TODAY_HIGH || P.high;
+        P.low  = TODAY_LOW  || P.low;
+        P.prevClose = YEST.close || P.prevClose;
+        // Recalc day change
+        if(YEST.close){
+          P.ch  = P.price - YEST.close;
+          P.chp = (P.ch / YEST.close) * 100;
+          $('p-dc').textContent=fp(P.ch,2);
+          $('p-dc').style.color=P.ch>=0?'var(--green)':'var(--red)';
+          $('p-dcp').textContent=fp(P.chp,2)+'%';
+          $('p-dcp').style.color=P.chp>=0?'var(--green)':'var(--red)';
+          $('pchg').textContent=`${fp(P.ch,2)}   (${fp(P.chp,2)}%)`;
+          $('pchg').style.color=P.ch>=0?'var(--green)':'var(--red)';
+        }
+        // Update price strip with 1H values
+        $('p-o').textContent=f2(TODAY_OPEN);
+        $('p-h').textContent=TODAY_HIGH?f2(TODAY_HIGH):'-';
+        $('p-l').textContent=TODAY_LOW?f2(TODAY_LOW):'-';
+      }
+    }
+    build1HTrend(rows, todayPrefix);
+    // Trigger recalc now that we have 1H data
+    if(P.price>0) recalc();
+    return true;
+  }catch(e){
+    console.error('1H fetch error:',e);return false;
+  }
+}
+
+// ?? 4H SHEET FETCH ??
+async function fetch4HSheet(){
+  // Try up to 3 times with delay (proxy rate limiting)
+  for(let attempt=1; attempt<=3; attempt++){
+    try{
+      if(attempt>1) await new Promise(r=>setTimeout(r,2000*attempt));
+      const raw=await proxyFetchWithOffset(SHEET_4H, 4); // 4H: start proxy 4
+      if(!raw||raw.length<50) throw new Error('Empty response attempt '+attempt);
+      const allRows=parseCSV(raw);
+      console.log('4H attempt',attempt,'rows:', allRows.length, 'Keys:', Object.keys(allRows[0]||{}));
+      if(!allRows.length) throw new Error('No rows parsed');
+      // Flexible filter: any row where the 5th column (Close) > 100
+      const rows=allRows.filter(r=>{
+        const vals=Object.values(r);
+        const c=r.Close||r.close||r.CLOSE||(vals.length>=5?vals[4]:'');
+        return c&&+c>100;
+      });
+      if(!rows.length) throw new Error('No valid 4H rows. Sample: '+JSON.stringify(allRows[0]));
+      DATA_4H=rows;
+      build4HTrend(rows);
+      // Trigger final recalc with all data
+      if(P.price>0) recalc();
+      $('gs-status').textContent='All sheets: ?';
+      $('gs-status').style.color='var(--green)';
+      return true;
+    }catch(e){
+      console.error('4H fetch attempt',attempt,'error:',e.message);
+      if(attempt===3){
+        // Show in debug what we got
+        console.error('4H FINAL FAIL. Using empty MTF for 4H.');
+        // Still build with empty so 1H can show
+        build4HTrend([]);
+        return false;
+      }
+    }
+  }
+  return false;
+}
+
+// ?? BUILD 1H TREND ??
+function build1HTrend(rows, todayPrefix){
+  const gc=(r,...keys)=>{for(const k of keys){if(r[k])return r[k];}return Object.values(r)[keys.length>2?4:1]||'';};
+  const last6=rows.slice(-6);
+  MTF.h1.candles=last6.map(r=>{
+    const dt=(gc(r,'DateTime','datetime','Date')||'').slice(5,16);
+    const o=+gc(r,'Open','open')||0, h=+gc(r,'High','high')||0;
+    const l=+gc(r,'Low','low')||0,   c=+gc(r,'Close','close')||0;
+    const dir=gc(r,'Direction','direction')||(c>=o?'BULL':'BEAR');
+    const trend=gc(r,'Trend','trend')||dir;
+    return{dt,o,h,l,c,dir,trend};
+  });
+  const last=MTF.h1.candles[MTF.h1.candles.length-1];
+  MTF.h1.dir   = last?.dir||'-';
+  MTF.h1.trend = last?.trend||'-';
+  const last20=rows.slice(-20);
+  MTF.h1.swingHigh=Math.max(...last20.map(r=>+(gc(r,'High','high'))||0));
+  const lows=last20.map(r=>+(gc(r,'Low','low'))||0).filter(v=>v>0);
+  MTF.h1.swingLow=lows.length?Math.min(...lows):0;
+  renderMTF();
+}
+
+// ?? BUILD 4H TREND ??
+function build4HTrend(rows){
+  if(!rows||!rows.length){
+    MTF.h4.candles=[];MTF.h4.dir='-';MTF.h4.trend='-';
+    MTF.h4.swingHigh=0;MTF.h4.swingLow=0;
+    renderMTF();return;
+  }
+  const gc=(r,...keys)=>{for(const k of keys){if(r[k])return r[k];}return Object.values(r)[1]||'';};
+  const last6=rows.slice(-6);
+  MTF.h4.candles=last6.map(r=>{
+    const dt=(gc(r,'DateTime','datetime','Date')||'').slice(5,16);
+    const o=+gc(r,'Open','open')||0, h=+gc(r,'High','high')||0;
+    const l=+gc(r,'Low','low')||0,   c=+gc(r,'Close','close')||0;
+    const dir=c>=o?'BULL':'BEAR';
+    return{dt,o,h,l,c,dir};
+  });
+  const last=MTF.h4.candles[MTF.h4.candles.length-1];
+  MTF.h4.dir=last?.dir||'-';
+  const last3=MTF.h4.candles.slice(-3);
+  const bulls=last3.filter(c=>c.dir==='BULL').length;
+  MTF.h4.trend=bulls>=2?'BULL':bulls<=1?'BEAR':'NEUTRAL';
+  const last10=rows.slice(-10);
+  MTF.h4.swingHigh=Math.max(...last10.map(r=>+(gc(r,'High','high'))||0));
+  const lows=last10.map(r=>+(gc(r,'Low','low'))||0).filter(v=>v>0);
+  MTF.h4.swingLow=lows.length?Math.min(...lows):0;
+  renderMTF();
+}
+
+// ?? MASTER FETCH ALL ??
+async function fetchSheet(){
+  $('gs-status').textContent='? Loading sheets...';
+  $('gs-status').style.color='var(--gold)';
+  // Sequential with gaps - avoids proxy rate limits
+  const d = await fetchDailySheet();
+  await new Promise(r=>setTimeout(r,1500));
+  const h1 = await fetch1HSheet();
+  await new Promise(r=>setTimeout(r,1500));
+  const h4 = await fetch4HSheet();
+  const ok = [d,h1,h4].filter(Boolean).length;
+  $('gs-status').textContent = ok===3 ? '? All 3 sheets' : ok+'/3 sheets loaded';
+  $('gs-status').style.color = ok===3 ? 'var(--green)' : ok>0 ? 'var(--gold)' : 'var(--red)';
+  // Recalc AFTER all data loaded - fixes "NO PRICE" signal
+  if(P.price>0) recalc();
+  else {
+    // Price not set yet - use latest 1H close as price
+    if(TODAY_CLOSE>0){
+      const yc=YEST.close||TODAY_OPEN;
+      setP(TODAY_CLOSE,TODAY_OPEN,TODAY_HIGH,TODAY_LOW,yc,
+        TODAY_CLOSE-yc, yc?((TODAY_CLOSE-yc)/yc)*100:0);
+    }
+    recalc();
+  }
+}
+
+function updateYestDisplay() {
+  $('p-yh').textContent = YEST.high  ? f2(YEST.high)  : '-';
+  $('p-yl').textContent = YEST.low   ? f2(YEST.low)   : '-';
+  $('p-yc').textContent = YEST.close ? f2(YEST.close) : '-';
+}
+
+// ======================================================
+// AUTO PRICE FETCH
+// ======================================================
+async function tryAutoFetch() {
+  setSt('? FETCHING','bf');
+  try {
+    let d = null;
+    // Try direct first
+    try {
+      const r1 = await fetch('https://api.gold-api.com/price/XAU',{cache:'no-store',mode:'cors'});
+      if(r1.ok) d = await r1.json();
+    } catch(e) {}
+    // Proxy fallback
+    if(!d||!d.price) {
+      const r2 = await fetch('https://api.allorigins.win/raw?url='+encodeURIComponent('https://api.gold-api.com/price/XAU'),{cache:'no-store'});
+      if(r2.ok) d = await r2.json();
+    }
+    if(!d) throw new Error('no data');
+    if(!d.price||d.price<500) throw new Error('bad');
+    // Only use price from API - all other values from sheets
+    setP(+d.price, TODAY_OPEN||+d.price, TODAY_HIGH||+d.price,
+         TODAY_LOW||+d.price, YEST.close||+d.price, 0, 0);
+    $('mi-p').value = (+d.price).toFixed(2);
+    setSt('? AUTO','bl');startCD();
+  } catch(e){
+    setSt('? BLOCKED','be');
+    $('manb').classList.add('show');
+  }
+}
+
+function startCD(){
+  clearInterval(cdTimer);cdown=30;
+  cdTimer=setInterval(()=>{cdown--;$('p-cd').textContent=`Refresh: ${cdown}s`;if(cdown<=0){clearInterval(cdTimer);tryAutoFetch();}},1000);
+}
+
+// ======================================================
+// MANUAL INPUT
+// ======================================================
+function toggleMan(){$('manb').classList.toggle('show')}
+function applyMan(){
+  const p=+$('mi-p').value||0; if(p<100) return;
+  // Only update current price - all other values from sheets
+  setP(p, TODAY_OPEN||p, TODAY_HIGH||p, TODAY_LOW||p,
+       YEST.close||p, 0, 0);
+  setSt('! LIVE','bl');
+  $('p-ts').textContent=new Date().toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit',second:'2-digit'});
+}
+
+function setP(price,open,high,low,prevClose,ch,chp){
+  const prev=P.price;
+  P.price    = price;
+  P.bid      = price - 0.15;
+  P.ask      = price + 0.15;
+  P.open     = TODAY_OPEN  || open     || price;
+  P.prevClose= YEST.close  || prevClose|| price;
+  P.ch       = YEST.close  ? price - YEST.close : ch;
+  P.chp      = YEST.close  ? ((price-YEST.close)/YEST.close)*100 : chp;
+
+  // LIVE HIGH/LOW: update if live price breaks beyond last sheet data
+  // This captures moves that happen AFTER the last sheet fetch
+  if(TODAY_HIGH>0){
+    if(price>TODAY_HIGH){ TODAY_HIGH=price; if($('p-h'))$('p-h').textContent=f2(TODAY_HIGH); if($('p-h-time'))$('p-h-time').textContent='live high'; }
+    P.high=TODAY_HIGH;
+  } else { P.high=price; }
+  if(TODAY_LOW>0){
+    if(price<TODAY_LOW){ TODAY_LOW=price; if($('p-l'))$('p-l').textContent=f2(TODAY_LOW); if($('p-l-time'))$('p-l-time').textContent='live low'; }
+    P.low=TODAY_LOW;
+  } else { P.low=price; }
+}
+function setSt(t,c){const e=$('fst');e.textContent=t;e.className='bdg '+c;}
+
+// ======================================================
+// CLOCK + SESSION
+// ======================================================
+function updClock(){
+  const n=new Date(),h=n.getUTCHours(),m=n.getUTCMinutes(),s=n.getUTCSeconds();
+  $('clk').textContent=`${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')} UTC`;
+  const dot=$('dot'),sb=$('sess');
+  let sess='',col='var(--dim)';
+  if(h>=8&&h<12){sess='? LONDON';col='var(--green)';sb.className='bdg bl';}
+  else if(h>=13&&h<17){sess='? OVERLAP';col='var(--gold)';sb.className='bdg bf';}
+  else if(h>=17&&h<22){sess='? NY';col='var(--blue)';sb.className='bdg bl';}
+  else if(h>=23||h<2){sess='? TOKYO';col='var(--purple)';sb.className='bdg bl';}
+  else{sess='? CLOSED';col='var(--dim)';sb.className='bdg bc';}
+  dot.style.background=col;dot.style.boxShadow=`0 0 5px ${col}`;
+  sb.textContent=h>=8&&h<22?'LIVE':'CLOSED';
+}
+setInterval(updClock,1000);updClock();
+
+// ======================================================
+// LOAD TODAY ASTRO
+// ======================================================
+function loadTodayAstro(){
+  const ds = todayStr();
+  const n = new Date();
+  $('tdate').textContent = n.toLocaleDateString('en-GB',{weekday:'short',day:'2-digit',month:'short',year:'numeric'});
+  $('ab-date').textContent = ds;
+  const row = MOON_CSV.find(r=>r.d===ds);
+  if(!row){TODAY_ASTRO=null;return;}
+  TODAY_ASTRO = row;
+  $('ab-ms').textContent=row.ms; $('ab-mp').textContent=row.mp;
+  $('ab-cs').textContent=row.cs; $('ab-sn').textContent=row.sn;
+  $('ab-dn').textContent=row.dn; $('ab-g').textContent=row.g;
+
+  // Sun sign
+  const sun = getCurrentSunSign(ds);
+  $('ab-sun').textContent=sun||'-';
+
+  // Zodiac bias for moon sign
+  const zod = ZODIAC_DB[row.ms];
+  if(zod){
+    $('ab-zbias').textContent=zod.bias;
+    const biasColor = {
+      'BREAKOUT':'var(--blue)','TREND':'var(--green)','SHARP MOVE':'var(--red)',
+      'REVERSAL':'var(--orange)','EXPANSION':'var(--green)','ACCUMULATION':'var(--gold)',
+      'VOLATILE':'var(--orange)','EMOTIONAL':'var(--purple)','RANGE':'var(--dim)',
+      'UNEXPECTED':'var(--purple)','EXHAUSTION':'var(--red)'
+    };
+    $('ab-zbias').style.color = biasColor[zod.bias]||'var(--text)';
+  }
+
+  // Next sign change
+  const idx=MOON_CSV.findIndex(r=>r.d===ds);
+  let nxt='-';
+  for(let i=idx+1;i<MOON_CSV.length;i++){
+    if(MOON_CSV[i].ms!==row.ms){const diff=i-idx;nxt=diff===1?'Tomorrow':diff+' days';break;}
+  }
+  $('ab-next').textContent=nxt;
+
+  // Confidence
+  calcAndShowConf(row, idx);
+}
+
+function getCurrentSunSign(ds){
+  const today=parseDate(ds);
+  if(!today) return '-';
+  let cur=null;
+  for(const e of SUN_DB){
+    const d=parseDate(e.d);
+    if(d&&d<=today){
+      const sign=e.e.replace('Sun enters ','').replace(/ \(.+\)/,'').trim();
+      cur=sign;
+    }
+  }
+  return cur||'Capricorn';
+}
+
+function getActiveSunInfo(ds){
+  const sign = getCurrentSunSign(ds);
+  return ZODIAC_DB[sign]||null;
+}
+
+// ======================================================
+// TRANSIT ANALYSIS
+// ======================================================
+function getActiveRetrogrades(ds){
+  const today=parseDate(ds);if(!today) return [];
+  const status={};
+  for(const e of RETRO_DB){
+    const d=parseDate(e.d);if(!d||d>today) continue;
+    const planet=e.e.split(' ')[0];
+    if(e.e.includes('Retrograde')) status[planet]='Retrograde';
+    else if(e.e.includes('Direct')) status[planet]='Direct';
+  }
+  return Object.entries(status).filter(([p,s])=>s==='Retrograde').map(([p])=>p);
+}
+
+function getTodayTransits(ds){
+  const today=parseDate(ds);if(!today) return [];
+  const window=3; // ?3 days
+  const all=[...RETRO_DB,...MOON_DB2,...INGRESS_DB,...ASPECT_DB];
+  return all.filter(e=>{
+    const d=parseDate(e.d);
+    return d && Math.abs(daysDiff(today,d))<=window;
+  }).map(e=>{
+    const d=parseDate(e.d);
+    const diff=daysDiff(today,d);
+    return {...e,diff};
+  }).sort((a,b)=>Math.abs(a.diff)-Math.abs(b.diff));
+}
+
+function scoreTransits(ds){
+  // Returns a score -30 to +30 and a description
+  const retros = getActiveRetrogrades(ds);
+  const transits = getTodayTransits(ds);
+  let score=0, signals=[];
+
+  // Retrograde scoring
+  if(retros.includes('Mercury')){score-=10;signals.push('? Mercury Rx: Avoid news trades, fog');}
+  if(retros.includes('Venus')){score-=8;signals.push('? Venus Rx: Gold may be choppy');}
+  if(retros.includes('Pluto')){score-=5;signals.push('? Pluto Rx: Hidden pressure on gold');}
+  if(retros.includes('Saturn')){score-=7;signals.push('? Saturn Rx: Bearish pressure');}
+  if(retros.includes('Jupiter')){score+=5;signals.push('? Jupiter Direct: Bullish expansion');}
+
+  // Today's major events
+  for(const t of transits){
+    if(Math.abs(t.diff)>1) continue; // only today/tomorrow
+    const e=t.e;
+    if(e.includes('Full Moon')){score-=5;signals.push('? Full Moon: Peak, reversal risk');}
+    if(e.includes('New Moon')){score+=5;signals.push('? New Moon: Fresh start, buy bias');}
+    if(e.includes('Solar Eclipse')){score-=15;signals.push('? Solar Eclipse: NO TRADE - extreme volatility');}
+    if(e.includes('Lunar Eclipse')){score-=15;signals.push('? Lunar Eclipse: NO TRADE - extreme volatility');}
+    if(e.includes('Sun Conjunction Jupiter')){score+=12;signals.push('??? Sun-Jupiter: Strong bullish expansion');}
+    if(e.includes('Sun Conjunction Saturn')){score-=10;signals.push('??? Sun-Saturn: Bearish contraction');}
+    if(e.includes('Sun Conjunction Mars')){score+=8;signals.push('??? Sun-Mars: High energy, sharp moves');}
+    if(e.includes('Sun Conjunction Pluto')){score-=8;signals.push('??? Sun-Pluto: Intense pressure, reversal');}
+    if(e.includes('Sun Conjunction Venus')){score+=6;signals.push('??? Sun-Venus: Gold supportive');}
+    if(e.includes('Sun Conjunction Neptune')){score-=6;signals.push('??? Sun-Neptune: Confusion, false moves');}
+    if(e.includes('Jupiter enters')){score+=8;signals.push('? Jupiter ingress: Expansion energy');}
+    if(e.includes('Saturn enters')){score-=8;signals.push('? Saturn ingress: Contraction energy');}
+    if(e.includes('Mars enters')){score+=5;signals.push('? Mars ingress: Momentum shift');}
+    if(e.includes('Mercury enters')){score+=2;signals.push('? Mercury ingress: Communication change');}
+  }
+
+  return {score:Math.max(-30,Math.min(30,score)), signals};
+}
+
+function renderTransitTicker(ds){
+  const transits=getTodayTransits(ds);
+  const retros=getActiveRetrogrades(ds);
+  const bar=$('transit-bar');
+
+  // Active retrogrades first
+  let html='';
+  if(retros.length>0){
+    retros.forEach(p=>{
+      html+=`<div class="tt retro"><span class="tt-icon">?</span><span class="tt-text">${p} Retrograde</span><span class="tt-date">ACTIVE</span></div>`;
+    });
+  }
+
+  // Upcoming/today transits
+  transits.slice(0,8).forEach(t=>{
+    const cls=t.diff===0?'today':t.diff>0?'soon':'';
+    const icon=t.e.includes('Full Moon')?'?':t.e.includes('New Moon')?'?':t.e.includes('Eclipse')?'?':t.e.includes('Retrograde')?'?':t.e.includes('Direct')?'?':t.e.includes('Jupiter')?'?':t.e.includes('Saturn')?'?':t.e.includes('Mars')?'?':t.e.includes('Venus')?'?':t.e.includes('Mercury')?'?':t.e.includes('Sun')?'?':'?';
+    const when=t.diff===0?'TODAY':t.diff===1?'TOMORROW':t.diff===-1?'YESTERDAY':t.diff>0?`+${t.diff}d`:`${t.diff}d`;
+    html+=`<div class="tt ${cls}"><span class="tt-icon">${icon}</span><span class="tt-text">${t.e}</span><span class="tt-date">${when}</span></div>`;
+  });
+  bar.innerHTML=html||'<div class="tt"><span class="tt-text">No major transits this week</span></div>';
+}
+
+// ======================================================
+// CONFIDENCE CALCULATION
+// ======================================================
+function calcAndShowConf(today, todayIdx){
+  const past=MOON_CSV.slice(0,todayIdx);
+  if(past.length<5){
+    $('ab-conf').textContent='N/A';$('crv').textContent='-';
+    $('crd').textContent='Not enough past data';return 50;
+  }
+  const f1m=past.filter(r=>r.ms===today.ms&&r.cs===today.cs);
+  const f1s=Math.min(100,(f1m.length/8)*100);
+  const f2m=past.filter(r=>r.sn===today.sn&&r.ms===today.ms);
+  const f2s=Math.min(100,(f2m.length/6)*100);
+  const phScores={'Full Moon':85,'New Moon':80,'First Quarter':75,'Last Quarter':75,'Waxing Gibbous':65,'Waning Gibbous':65,'Waxing Crescent':50,'Waning Crescent':45};
+  const f3s=phScores[today.mp]||60;
+  const f4m=past.filter(r=>r.dn===today.dn&&r.g===today.g);
+  const f4s=Math.min(100,(f4m.length/4)*100);
+  const conf=Math.round(f1s*.30+f2s*.25+f3s*.25+f4s*.20);
+  $('ab-conf').textContent=conf+'%';$('crv').textContent=conf+'%';
+  const off=106.8-(106.8*conf/100);
+  $('crf').setAttribute('stroke-dashoffset',off);
+  const rc=conf>=70?'var(--green)':conf>=50?'var(--blue)':'var(--orange)';
+  $('crf').setAttribute('stroke',rc);$('crv').style.color=rc;
+  $('crd').innerHTML=`<b>Sign+Stage:</b> ${f1m.length} matches<br><b>Stage# matches:</b> ${f2m.length}<br><b>Phase score:</b> ${f3s}%<br><b>Day# pattern:</b> ${f4m.length}`;
+  return conf;
+}
+
+// ======================================================
+// SCORING ENGINE
+// ======================================================
+function calcScores(){
+  const{price,open,high,low,prevClose}=P;
+  if(!price||!TODAY_ASTRO) return null;
+  const ta=TODAY_ASTRO;
+  const ds=ta.d;
+  const tr=activeTr,cf=parseInt($('ab-conf').textContent)||50;
+  const aB=gn('abull'),aBr=gn('abear'),aR=gn('arng');
+  const sunSign=getCurrentSunSign(ds);
+  const moonZod=ZODIAC_DB[ta.ms]||{};
+  const sunZod=ZODIAC_DB[sunSign]||{};
+  const {score:tScore,signals:tSigs}=scoreTransits(ds);
+  const retros=getActiveRetrogrades(ds);
+
+  // Pivots from yesterday (if available) else today
+  const yH=YEST.high||high, yL=YEST.low||low, yC=YEST.close||prevClose;
+  const PP=(yH+yL+yC)/3,R1=2*PP-yL,R2=PP+(yH-yL),R3=R1+(yH-yL);
+  const S1=2*PP-yH,S2=PP-(yH-yL),S3=S1-(yH-yL);
+  const cp=yH!==yL?((yC-yL)/(yH-yL))*100:50;
+  // TODAY direction = price vs today's open (most accurate current bias)
+  // Yesterday direction = secondary context only
+  const pdToday = TODAY_OPEN>0 ? (price>=TODAY_OPEN?1:-1) : (price>=open?1:-1); // today direction
+  const pdYest  = yC>=YEST.open ? 1 : -1;         // yesterday's full day direction
+  // Primary direction uses today if price moved significantly, else yesterday
+  const priceMoved = Math.abs(price-open) > 5;
+  const pd = priceMoved ? pdToday : pdYest;
+
+  // MOON SIGN SCORE (intraday primary - uses TODAY's price direction)
+  let moonScore=0;
+  const moonBullSigns=['Aries','Leo','Sagittarius','Cancer'];
+  const moonBearSigns=['Capricorn','Scorpio','Virgo'];
+  if(moonBullSigns.includes(ta.ms)) moonScore+=15;
+  else if(moonBearSigns.includes(ta.ms)) moonScore-=15;
+  if(moonZod.bias==='BREAKOUT'&&price>PP) moonScore+=5;
+  if(moonZod.bias==='REVERSAL') moonScore-=5;
+  if(moonZod.bias==='TREND'&&pdToday===1) moonScore+=8;   // use TODAY's dir
+  if(moonZod.bias==='TREND'&&pdToday===-1) moonScore-=8;  // use TODAY's dir
+  if(moonZod.bias==='SHARP MOVE') moonScore+=Math.abs(moonScore)>0?5:-5;
+  if(ta.cs==='FINISH') moonScore*=0.7;
+
+  // SUN SIGN SCORE (long-term context)
+  let sunScore=0;
+  const sunBull=['Aries','Leo','Sagittarius'];
+  const sunBear=['Capricorn','Scorpio','Virgo'];
+  if(sunBull.includes(sunSign)) sunScore+=10;
+  else if(sunBear.includes(sunSign)) sunScore-=10;
+  if(sunZod.bias==='EXPANSION') sunScore+=8;
+  if(sunZod.bias==='REVERSAL') sunScore-=8;
+  if(sunZod.bias==='ACCUMULATION') sunScore+=5;
+  if(sunZod.bias==='EXHAUSTION') sunScore-=8;
+
+  // SUN/MOON CONFLICT: short-term = moon wins but flag it
+  const moonBull=moonScore>0,sunBull2=sunScore>0;
+  const conflict=moonBull!==sunBull2;
+
+  // BUY SCORE - uses pdToday for live price direction
+  let bS=0;
+  if(tr==='BULL-BUY')bS+=25;else if(tr==='BEAR-BUY')bS+=10;
+  if(pdToday===1)bS+=15;   // TODAY's direction (primary)
+  if(pdYest===1)bS+=5;     // yesterday confirmation (secondary, smaller weight)
+  if(cp>60)bS+=10;else if(cp>40)bS+=5;
+  if(aB>aBr)bS+=10;
+  if(cf>=70)bS+=10;else if(cf>=50)bS+=5;
+  if(ta.cs==='START')bS+=8;if(ta.cs==='MOVE')bS+=4;
+  if(moonScore>0)bS+=6;
+  if(moonZod.bias==='BREAKOUT')bS+=5;if(moonZod.bias==='TREND'&&pdToday===1)bS+=8;
+  if(ta.mp==='Full Moon'||ta.mp==='Waxing Gibbous')bS+=5;
+  if(ta.mp==='New Moon')bS+=4;
+  if(price>R1)bS+=5;if(price>open)bS+=8;if(price>yH)bS+=5;
+  if(retros.includes('Mercury'))bS-=5;
+  bS=Math.min(100,Math.max(0,bS));
+
+  // SELL SCORE - uses pdToday for live price direction
+  let sS=0;
+  if(tr==='BEAR-SELL')sS+=25;else if(tr==='BULL-SELL')sS+=10;
+  if(pdToday===-1)sS+=15;  // TODAY's direction (primary)
+  if(pdYest===-1)sS+=5;    // yesterday confirmation (secondary)
+  if(cp<40)sS+=10;else if(cp<60)sS+=5;
+  if(aBr>aB)sS+=10;
+  if(cf>=70)sS+=10;else if(cf>=50)sS+=5;
+  if(ta.cs==='FINISH')sS+=8;
+  if(moonScore<0)sS+=6;
+  if(moonZod.bias==='REVERSAL')sS+=8;if(moonZod.bias==='EXHAUSTION')sS+=8;
+  if(ta.mp==='Last Quarter'||ta.mp==='Waning Gibbous')sS+=5;
+  if(ta.mp==='Waning Crescent')sS+=4;
+  if(price<S1)sS+=5;if(price<open)sS+=8;if(price<yL)sS+=5;
+  if(retros.includes('Mercury'))sS+=3;
+  sS=Math.min(100,Math.max(0,sS));
+
+  const nS=bS-sS;
+
+  // TRANSIT SCORE (applied to net)
+  let transScore=tScore;
+
+  // HIST SCORE
+  let hS=0;
+  if(cf>=75)hS+=30;else if(cf>=60)hS+=20;else if(cf>=45)hS+=10;
+  if(gn('hist')>=15)hS+=15;else if(gn('hist')>=8)hS+=8;else if(gn('hist')>=4)hS+=3;
+  if(bS>sS&&aB>aBr)hS+=15;if(sS>bS&&aBr>aB)hS+=15;
+
+  // TRANSITION SCORE
+  let trS=0;
+  if(tr==='BULL-BUY'||tr==='BEAR-SELL')trS+=30;
+  else if(tr==='BULL-SELL'||tr==='BEAR-BUY')trS+=15;
+  if(ta.sn>=3)trS+=10;else if(ta.sn>=2)trS+=5;
+  if(ta.cs==='FINISH')trS-=15;if(ta.cs==='MOVE')trS+=5;
+
+  // LIVE SCORE
+  const lOpen=TODAY_OPEN||open;
+  const lHigh=TODAY_HIGH||0;
+  const lLow=TODAY_LOW||0;
+  let lS=0;
+  if(bS>sS&&price>PP)lS+=15;if(sS>bS&&price<PP)lS+=15;
+  if(bS>sS&&price>lOpen)lS+=10;if(sS>bS&&price<lOpen)lS+=10;
+  if(bS>sS&&YEST.close&&price>YEST.close)lS+=10;
+  if(sS>bS&&YEST.close&&price<YEST.close)lS+=10;
+  if(lHigh>0&&price>=lHigh*.999)lS-=5;
+  if(lLow>0&&price<=lLow*1.001)lS-=5;
+  if(YEST.high&&price>YEST.high)lS+=5;
+  if(YEST.low&&price<YEST.low)lS+=5;
+
+  // RISK
+  let rS=0;
+  if(ta.cs==='FINISH')rS+=30;
+  if(cf<45)rS+=20;if(cf<30)rS+=10;
+  if((tr==='BEAR-BUY'||tr==='BULL-SELL')&&Math.abs(nS)<20)rS+=15;
+  if(retros.includes('Mercury'))rS+=10;
+  if(retros.includes('Venus'))rS+=8;
+  const todayEvents=getTodayTransits(ds).filter(t=>Math.abs(t.diff)<=0);
+  if(todayEvents.some(t=>t.e.includes('Eclipse')))rS+=30;
+
+  // MTF SCORE
+  const mtfScore=getMTFScore();
+
+  // DYNAMIC WEIGHTING based on alignment strength
+  // When all 3 TF agree -> MTF dominates (price structure > astro)
+  // When TF conflict -> astro gets more weight (uncertainty = trust cycles)
+  const mtfAbsolute = Math.abs(mtfScore);
+  const allTFAligned = mtfAbsolute >= 25; // all 3 timeframes agree
+  const priceClearlyDirectional = Math.abs(price-open) > 10; // price moved strongly
+
+  let wMoon, wSun, wHist, wTrans, wLive, wMTF;
+  if(allTFAligned && priceClearlyDirectional){
+    // STRONG ALIGNMENT: MTF leads, astro is context only
+    wMTF=0.40; wLive=0.20; wTrans=0.15; wHist=0.15; wMoon=0.07; wSun=0.03;
+  } else if(allTFAligned){
+    // MTF agrees but price not strongly moving yet
+    wMTF=0.30; wLive=0.18; wTrans=0.17; wHist=0.15; wMoon=0.13; wSun=0.07;
+  } else {
+    // No clear MTF signal: astro + history dominate
+    wMTF=0.20; wLive=0.15; wTrans=0.15; wHist=0.20; wMoon=0.20; wSun=0.10;
+  }
+
+  const baseRaw = moonScore*wMoon + hS*wHist + trS*wTrans + lS*wLive;
+  const sunAdj  = sunScore*wSun;
+  const mtfAdj  = mtfScore*wMTF;
+  const totalRaw= baseRaw + sunAdj + mtfAdj + transScore;
+  const bias    = Math.round(totalRaw*(nS>=0?1:-1));
+
+  return{bS,sS,nS,moonScore,sunScore,hS,trS,lS,rS,bias,PP,R1,R2,R3,S1,S2,S3,cp,pd,
+         conflict,tScore,tSigs,retros,sunSign,moonZod,sunZod,yH,yL,yC,
+         allTFAligned,mtfScore,wMTF,wMoon,pdToday,pdYest};
+}
+
+function calcEP(sc){
+  const{PP,R1,R2,S1,S2,bias}=sc,{high,low}=P;
+  const yH=YEST.high||high,yL=YEST.low||low;
+  const aB=gn('abull'),aBr=gn('abear'),aR=gn('arng'),iB=bias>=0,atr=+(aR*.6).toFixed(1);
+  const bE1=+(S1+1).toFixed(1),bE2=+(yL+2).toFixed(1);
+  const sE1=+(R1-1).toFixed(1),sE2=+(yH-2).toFixed(1);
+  const conf=+(iB?PP+.5:PP-.5).toFixed(1);
+  const inv=+(iB?bE1-3:sE1+3).toFixed(1);
+  const sl=+(iB?inv-5:inv+5).toFixed(1);
+  const tp1=+(iB?PP+2:PP-2).toFixed(1);
+  const tp2=+(iB?R1:S1).toFixed(1);
+  const tp3=+(iB?yH+aB*.5:yL-aBr*.5).toFixed(1);
+  const tp4=+(iB?bE1+aB:sE1-aBr).toFixed(1);
+  const ent=iB?bE1:sE1;
+  const rr=t=>{const r=Math.abs(t-ent)/Math.abs(ent-sl);return(isFinite(r)&&r>.01)?r.toFixed(1)+'R':'-'};
+  return{bE1,bE2,sE1,sE2,conf,inv,sl,tp1,tp2,tp3,tp4,atr,
+    rH:+(PP+atr).toFixed(1),rL:+(PP-atr).toFixed(1),PP,R1,R2,S1,S2,iB,rr};
+}
+
+// ======================================================
+// MAIN RECALC
+// ======================================================
+function recalc(){
+  const sc=calcScores();
+  if(!sc){return;}
+  const ep=calcEP(sc);
+  const mtfScore=getMTFScore();
+  const{price,open,high,low,prevClose}=P;
+  const abs=Math.abs(sc.bias);
+
+  // SIGNAL - thresholds scaled to new weight system (max bias ~36)
+  // Scale: 73% of max = STRONG, 50% = BUY, 20% = NEUTRAL
+  const STRONG=25, BUY_T=18, NEUT=7;
+  let sT='* NO PRICE',sC='s-nt';
+  if     (sc.bias >= STRONG) {sT='? STRONG BUY';  sC='s-sb';}
+  else if(sc.bias >= BUY_T)  {sT='? BUY';          sC='s-b'; }
+  else if(sc.bias <=-STRONG) {sT='? STRONG SELL';  sC='s-ss';}
+  else if(sc.bias <=-BUY_T)  {sT='? SELL';          sC='s-s'; }
+  else if(Math.abs(sc.bias)>=NEUT){sT='* NEUTRAL';  sC='s-n'; }
+  else                        {sT='* NO TRADE';      sC='s-nt';}
+  $('sig').textContent=sT;$('sig').className=sC;
+
+  // Needle: scale bias to 0-100 range (max bias 36 -> 100%)
+  const MAX_BIAS=36;
+  const pct=((sc.bias/MAX_BIAS)*50)+50; // center=50%, ?36 fills range
+  $('nd').style.left=`${Math.min(98,Math.max(2,pct))}%`;
+  const bv=$('bsc');const biasMax=36;const biasPct=Math.round(Math.abs(sc.bias)/biasMax*100);bv.textContent=(sc.bias>0?'+':'')+sc.bias.toFixed(1)+' ('+biasPct+'%)';
+  bv.style.color=sc.bias>0?'var(--green)':sc.bias<0?'var(--red)':'var(--gold)';
+
+  // STATS
+  $('s-risk').textContent=sc.rS>50?'? HIGH':sc.rS>25?'? MEDIUM':'? LOW';
+  $('s-risk').className=`siv ${sc.rS>50?'cr':sc.rS>25?'cg2':'cg'}`;
+  $('s-style').textContent=abs>=25?'Trend Follow':abs>=18?'Trend':abs>=12?'Reversal':'Range/NoTrade';
+  $('s-buy').textContent=sc.bS;$('s-sell').textContent=sc.sS;
+  $('s-moon').textContent=(sc.moonScore>0?'+':'')+Math.round(sc.moonScore);
+  if($('s-mtf')) { $('s-mtf').textContent=(mtfScore>0?'+':'')+mtfScore; $('s-mtf').className='siv '+(mtfScore>0?'cg':mtfScore<0?'cr':'cdm'); }
+  $('s-sun').textContent=(sc.sunScore>0?'+':'')+Math.round(sc.sunScore);
+  $('s-trans2').textContent=(sc.tScore>0?'+':'')+sc.tScore;
+  $('s-live').textContent=(sc.lS>0?'+':'')+sc.lS;
+
+  // WEIGHT MODE INDICATOR
+  const wMode=$('weight-mode');
+  if(wMode){
+    if(sc.allTFAligned){
+      wMode.textContent='! MTF MODE: All 3 TF aligned - Price overrides Astro';
+      wMode.style.cssText='font-size:9px;padding:4px 7px;border-radius:3px;background:rgba(0,229,255,.08);border:1px solid rgba(0,229,255,.3);color:var(--blue);letter-spacing:1px;font-weight:700;text-align:center';
+    } else {
+      wMode.textContent='? ASTRO MODE: No clear TF alignment - Cycles & Moon lead';
+      wMode.style.cssText='font-size:9px;padding:4px 7px;border-radius:3px;background:rgba(187,134,252,.06);border:1px solid rgba(187,134,252,.2);color:var(--purple);letter-spacing:1px;font-weight:700;text-align:center';
+    }
+  }
+
+  // FINISH BOX
+  const isF=TODAY_ASTRO?.cs==='FINISH';
+  const fb=$('fb');
+  fb.className=isF?'fin-on':'fin-ok';
+  fb.textContent=isF?'? FINISH STAGE ? TP1/TP2 ONLY ? REVERSAL RISK':'? Stage OK - All TPs valid';
+
+  // SUN/MOON + ASTRO/PRICE CONFLICT
+  const cb=$('conflict-box');
+  const priceIsBull = P.price > P.open;
+  const moonIsBull  = sc.moonScore > 0;
+  const mtfIsBull   = sc.tScore >= 0; // using mtfScore via sc
+  const astroVsPrice = (moonIsBull && !priceIsBull) || (!moonIsBull && priceIsBull);
+
+  if(sc.conflict && astroVsPrice){
+    cb.className='conflict-box cf-conflict';
+    cb.innerHTML=`? DOUBLE CONFLICT: Sun/Moon + Astro/Price<br>
+      <span style="font-size:8px;font-weight:400">
+      Moon: ${sc.moonScore>0?'BULL':'BEAR'} ? Sun: ${sc.sunScore>0?'BULL':'BEAR'}<br>
+      Price direction: ${priceIsBull?'UP (intraday)':'DOWN (intraday)'}<br>
+      ! MTF rules short term - use MTF signal
+      </span>`;
+  } else if(astroVsPrice){
+    cb.className='conflict-box cf-conflict';
+    cb.innerHTML=`! ASTRO vs PRICE CONFLICT<br>
+      <span style="font-size:8px;font-weight:400">
+      Moon (${TODAY_ASTRO?.ms}): ${moonIsBull?'Bullish':'Bearish'} ? Price: ${priceIsBull?'? UP':'? DOWN'}<br>
+      Short term -> follow PRICE + MTF<br>
+      Long term -> Moon cycle context
+      </span>`;
+  } else if(sc.conflict){
+    cb.className='conflict-box cf-conflict';
+    cb.innerHTML=`? SUN/MOON CONFLICT<br><span style="font-size:8px;font-weight:400">Moon: ${sc.moonScore>0?'BULL':'BEAR'} (intraday) ? Sun: ${sc.sunScore>0?'BULL':'BEAR'} (long-term)</span>`;
+  } else {
+    const allGood = !astroVsPrice && !sc.conflict;
+    cb.className=`conflict-box ${allGood?'cf-agree':'cf-conflict'}`;
+    cb.innerHTML=allGood
+      ? `? Astro + Price Aligned - ${moonIsBull?'Both BULLISH':'Both BEARISH'}`
+      : `! Price overrides Astro - follow MTF`;
+  }
+
+  // TRANSIT SIGNAL
+  const ts=$('transit-sig');
+  if(sc.tSigs.length>0){
+    const positive=sc.tScore>5,negative=sc.tScore<-5,neutral=Math.abs(sc.tScore)<=5;
+    ts.className=`transit-sig ${positive?'ts-bull':negative?'ts-bear':neutral?'ts-caution':'ts-warn'}`;
+    ts.innerHTML=`<b>Transit Score: ${sc.tScore>0?'+':''}${sc.tScore}</b><br>`+sc.tSigs.slice(0,3).join('<br>');
+  } else {
+    ts.className='transit-sig ts-neutral';
+    ts.textContent='No major transits today';
+  }
+
+  // SCORE BARS
+  const modeLabel = sc.allTFAligned ? 'MTF?40%' : 'MTF?20%';
+  const moonLabel = sc.allTFAligned ? 'MOON?7%' : 'MOON?20%';
+  const bars=[
+    {l:'BUY SCORE',v:sc.bS,mx:100,c:'var(--green)'},{l:'SELL SCORE',v:sc.sS,mx:100,c:'var(--red)'},
+    {l:moonLabel,v:sc.moonScore,mx:30,c:'var(--purple)'},{l:'SUN SIGN',v:sc.sunScore,mx:20,c:'var(--gold)'},
+    {l:'TRANSIT',v:sc.tScore,mx:30,c:'var(--blue)'},{l:'HISTORICAL',v:sc.hS,mx:60,c:'var(--gold2)'},
+    {l:'LIVE PRICE',v:sc.lS,mx:40,c:'var(--green2)'},{l:modeLabel,v:mtfScore,mx:30,c:'var(--blue)'},
+    {l:'RISK^=BAD',v:sc.rS,mx:80,c:'var(--orange)'},
+  ];
+  $('sbars').innerHTML=bars.map(b=>{
+    const p=Math.min(100,(Math.abs(b.v)/b.mx)*100);
+    const nc=b.l.includes('RISK')?(b.v>50?'var(--red)':'var(--green)'):(b.v>=0?b.c:'var(--dim)');
+    return`<div class="sbr"><span class="sbl">${b.l}</span><div class="sbt"><div class="sbf" style="width:${p}%;background:${b.c}"></div></div><span class="sbn" style="color:${nc}">${b.v>0?'+':''}${Math.round(b.v)}</span></div>`;
+  }).join('');
+
+  // DECISION
+  // Decision thresholds scaled to new bias range (max ~36)
+  let dT=' WAIT - PRICE NOT AT ZONE',dC='d-w';
+  if(activeTr==='NO TRADE'){dT='* NO TRADE TODAY';dC='d-w';}
+  else{
+    const todEvt=getTodayTransits(today_str_cache||todayStr()).filter(t=>Math.abs(t.diff)===0);
+    if(todEvt.some(t=>t.e.includes('Eclipse'))){dT='? ECLIPSE TODAY - DO NOT TRADE';dC='d-f';}
+    else if(isF&&sc.rS>40){dT='? FINISH STAGE - EXIT EARLY';dC='d-f';}
+    else if(sc.bias>=18&&price>ep.bE1){dT=`? BUY ABOVE ${f1(ep.bE1)}`;dC='d-b';}
+    else if(sc.bias<=-18&&price<ep.sE1){dT=`? SELL BELOW ${f1(ep.sE1)}`;dC='d-s';}
+    else if(sc.bias>=12&&price>ep.S1&&price<ep.PP+3){dT=`? BUY REJECTION FROM ${f1(ep.S1)}`;dC='d-b';}
+    else if(sc.bias<=-12&&price<ep.R1&&price>ep.PP-3){dT=`? SELL REJECTION FROM ${f1(ep.R1)}`;dC='d-s';}
+    else if(Math.abs(sc.bias)<7){dT='? RANGE MAP ONLY';dC='d-w';}
+  }
+  $('decision').textContent=dT;$('decision').className=dC;
+
+  // FORECAST STATUS
+  const isBull=sc.bias>=7; // use scaled threshold
+  let fT='? MONITORING',fC='fn';
+  if(activeTr==='NO TRADE'){fT='* NO TRADE';fC='fn';}
+  else if(isBull&&price>open&&price>prevClose){fT='? FORECAST WORKING';fC='fw';}
+  else if(isBull&&price<open-5){fT='? FORECAST FAILED - USE RANGE';fC='ff';}
+  else if(!isBull&&price<open&&price<prevClose){fT='? FORECAST WORKING';fC='fw';}
+  else if(!isBull&&price>open+5){fT='? FORECAST FAILED - USE RANGE';fC='ff';}
+  $('fcs').textContent=fT;$('fcs').className=fC;
+
+  // LIVE ROWS
+  $('lv-p').textContent=f2(price);
+  // Use 1H-derived values for today, YEST for yesterday
+  const lvTdO = TODAY_OPEN||open;
+  const lvTdH = TODAY_HIGH||0;
+  const lvTdL = TODAY_LOW||0;
+  const lvYC  = YEST.close||prevClose;
+  [
+    ['lv-o',  lvTdO?price-lvTdO:null,         'Today Open'],
+    ['lv-c',  lvYC ?price-lvYC :null,          'Prev Close'],
+    ['lv-h',  lvTdH?price-lvTdH:null,          'Today High'],
+    ['lv-l',  lvTdL?price-lvTdL:null,          'Today Low'],
+    ['lv-pp', price-ep.PP,                      'Pivot PP'],
+    ['lv-yh', YEST.high?price-YEST.high:null,  'Yest High'],
+    ['lv-yl', YEST.low ?price-YEST.low :null,  'Yest Low'],
+  ].forEach(([id,d,lb])=>{
+    if(!$(id)) return;
+    if(d===null){$(id).textContent='- Loading';$(id).style.color='var(--dim)';return;}
+    const e=$(id);e.textContent=`${fp(d,2)} vs ${lb}`;e.style.color=d>=0?'var(--green)':'var(--red)';
+  });
+  $('lv-inv').textContent=f1(ep.inv);$('lv-rng').textContent=`${f1(ep.rL)} -> ${f1(ep.rH)}`;
+
+  // STAGE DETAIL
+  const TR={
+    'BULL-BUY':{t:'BULL->BUY (Continuation)',r:'Buy dips to S1, add above PP.',sl:f1(ep.sl),tp:'TP3/TP4',c:'cg'},
+    'BULL-SELL':{t:'BULL->SELL (Profit Take)',r:'Sell at R1/R2. Tight SL.',sl:f1(ep.sl),tp:'TP1/TP2',c:'cb'},
+    'BEAR-BUY':{t:'BEAR->BUY (Counter)',r:'Small size only. Must hold S2.',sl:f1(ep.sl),tp:'TP1 only',c:'cg2'},
+    'BEAR-SELL':{t:'BEAR->SELL (Continuation)',r:'Sell bounces to R1, add below PP.',sl:f1(ep.sl),tp:'TP3/TP4',c:'cr'},
+    'NO TRADE':{t:'NO TRADE DAY',r:'Stay flat.',sl:'-',tp:'-',c:'cdm'},
+  };
+  const rule=TR[activeTr]||TR['BULL-BUY'];
+  $('stage-det').innerHTML=`<b class="${rule.c}">${rule.t}</b><br>${rule.r}<br>SL: <b>${rule.sl}</b> ? TP: <b>${rule.tp}</b><br>Stage: <b>${TODAY_ASTRO?.cs}</b> #${TODAY_ASTRO?.sn} ? ${TODAY_ASTRO?.mp}`;
+
+  // SUN CONTEXT
+  $('sun-context').innerHTML=`Sun in <b>${sc.sunSign}</b> ? Bias: <b>${sc.sunZod?.bias||'-'}</b><br><span style="font-size:8px;color:var(--dim)">Long-term: ${sc.sunZod?.bias==='TREND'?'TRENDING environment':sc.sunZod?.bias==='REVERSAL'?'REVERSAL zone':sc.sunZod?.bias==='EXPANSION'?'EXPANSION mode':sc.sunZod?.bias==='EXHAUSTION'?'EXHAUSTION - reduce size':sc.sunZod?.bias||'-'}</span>`;
+
+  // RETROGRADES
+  if(sc.retros.length>0){
+    $('retro-status').innerHTML=sc.retros.map(p=>{
+      const warn={Mercury:'Avoid news trades, foggy signals',Venus:'Gold choppy, trust levels',Pluto:'Hidden pressure builds',Saturn:'Bearish structure',Jupiter:'Expansion reduces'};
+      return`<span class="cr">? ${p} Retrograde</span>: ${warn[p]||'Caution'}`;
+    }).join('<br>');
+  } else {
+    $('retro-status').innerHTML='<span class="cg">All major planets direct</span>';
+  }
+
+  // KEY LEVELS TABLE
+  renderLevels(sc, ep);
+
+  // ENTRY PLAN TABLE
+  renderEP(ep, sc);
+  renderNA(sc, ep);
+
+  $('ep-atr').textContent='$'+f1(ep.atr);
+  $('ep-rng').textContent=`${f1(ep.rL)}-${f1(ep.rH)}`;
+}
+
+let today_str_cache = null;
+
+function renderLevels(sc, ep){
+  const{price}=P;
+  const near=p=>p&&Math.abs(price-p)<=3;
+  const status=p=>{
+    if(!p||p===0) return '<span class="cdm">-</span>';
+    if(near(p)) return '<span class="near-b">? NEAR</span>';
+    return price>p?'<span class="cg" style="font-size:8px">^ ABOVE</span>':'<span class="cr" style="font-size:8px">v BELOW</span>';
+  };
+  const rows=[
+    {cls:'l-r3',lbl:'1H SWING HI',p:MTF.h1.swingHigh||0,type:'1H Swing'},
+    {cls:'l-r3',lbl:'4H SWING HI',p:MTF.h4.swingHigh||0,type:'4H Swing'},
+    {cls:'l-r3',lbl:'YEST HIGH',p:YEST.high,type:'Resistance'},
+    {cls:'l-r2',lbl:'R3',p:sc.R3,type:'Pivot R3'},
+    {cls:'l-r2',lbl:'R2',p:sc.R2,type:'Pivot R2'},
+    {cls:'l-r1',lbl:'R1',p:sc.R1,type:'Pivot R1'},
+    {cls:'l-pp',lbl:'PIVOT PP',p:sc.PP,type:'Pivot'},
+    {cls:'l-s1',lbl:'S1',p:sc.S1,type:'Pivot S1'},
+    {cls:'l-s2',lbl:'S2',p:sc.S2,type:'Pivot S2'},
+    {cls:'l-s3',lbl:'S3',p:sc.S3,type:'Pivot S3'},
+    {cls:'l-yl',lbl:'YEST LOW',p:YEST.low,type:'Support'},
+    {cls:'l-s3',lbl:'4H SWING LO',p:MTF.h4.swingLow||0,type:'4H Swing'},
+    {cls:'l-s3',lbl:'1H SWING LO',p:MTF.h1.swingLow||0,type:'1H Swing'},
+    {cls:'l-yo',lbl:'YEST OPEN',p:YEST.open,type:'Reference'},
+    {cls:'l-yc',lbl:'YEST CLOSE',p:YEST.close,type:'Reference'},
+    {cls:'l-yh',lbl:'TODAY HIGH',p:TODAY_HIGH||0,type:'Session Hi (running)'},
+    {cls:'l-yl',lbl:'TODAY LOW',p:TODAY_LOW||0,type:'Session Lo (running)'},
+    {cls:'l-yo',lbl:'TODAY OPEN',p:TODAY_OPEN||0,type:'Session Open'},
+  ].filter(r=>r.p&&r.p>0).sort((a,b)=>b.p-a.p);
+
+  $('lev-body').innerHTML=rows.map(r=>`<tr class="${near(r.p)?'near':''}">
+    <td class="${r.cls}">${r.lbl}</td>
+    <td style="font-size:12px;color:var(--gold)">${f1(r.p)}</td>
+    <td style="color:var(--dim);font-family:'Rajdhani',sans-serif;font-size:8px">${r.type}</td>
+    <td>${status(r.p)}</td>
+  </tr>`).join('');
+}
+
+function renderEP(ep,sc){
+  const{price}=P,iB=ep.iB;
+  const near=p=>Math.abs(price-p)<=3;
+  const pc=l=>l.includes('BUY')&&!l.includes('TP')?'var(--green)':l.includes('SELL')&&!l.includes('TP')?'var(--red)':l.startsWith('TP')?'var(--green2)':'var(--gold)';
+  const st=p=>{
+    if(near(p)) return'<span class="near-b">? NEAR</span>';
+    return price>p?'<span class="cg" style="font-size:8px">^</span>':'<span class="cr" style="font-size:8px">v</span>';
+  };
+  const rows=[
+    {c:'rb1',l:'BUY ENTRY 1',p:ep.bE1,rr:ep.rr(ep.tp1),a:iB},
+    {c:'rb2',l:'BUY ENTRY 2',p:ep.bE2,rr:ep.rr(ep.tp1),a:iB},
+    {c:'rs1',l:'SELL ENTRY 1',p:ep.sE1,rr:ep.rr(ep.tp1),a:!iB},
+    {c:'rs2',l:'SELL ENTRY 2',p:ep.sE2,rr:ep.rr(ep.tp1),a:!iB},
+    {c:'rco',l:'CONFIRMATION',p:ep.conf,rr:'-'},
+    {c:'rin',l:'INVALIDATION',p:ep.inv,rr:'-'},
+    {c:'rsl',l:'STOP LOSS',p:ep.sl,rr:'-'},
+    {c:'rt1',l:'TP1  50%',p:ep.tp1,rr:ep.rr(ep.tp1)},
+    {c:'rt2',l:'TP2  25%',p:ep.tp2,rr:ep.rr(ep.tp2)},
+    {c:'rt3',l:'TP3  15%',p:ep.tp3,rr:ep.rr(ep.tp3)},
+    {c:'rt4',l:'TP4  10%',p:ep.tp4,rr:ep.rr(ep.tp4)},
+  ];
+  $('ep-body').innerHTML=rows.map(r=>`<tr class="${r.c}${near(r.p)?' near':''}" style="opacity:${r.a===undefined?1:r.a?1:.3}">
+    <td><span class="elbl">${r.l}</span></td>
+    <td style="color:${pc(r.l)};font-size:12px">${f1(r.p)}</td>
+    <td style="color:var(--blue)">${r.rr}</td>
+    <td>${st(r.p)}</td>
+  </tr>`).join('');
+}
+
+function renderNA(sc,ep){
+  const{price}=P,iB=sc.bias>=7,isF=TODAY_ASTRO?.cs==='FINISH'; // use live bias not just ep.iB
+  let lines=[];
+  if(activeTr==='NO TRADE'){lines.push('? <b>No trade today.</b> Stay flat.');}
+  else if(sc.rS>50){lines.push('?? <b style="color:var(--orange)">High risk.</b> Reduce size 50% or skip today.');}
+  else if(Math.abs(sc.bias)<20){
+    lines.push(`? <b style="color:var(--gold)">Range day.</b> ${f1(ep.rL)} ? ${f1(ep.rH)}`);
+  } else if(iB){
+    if(price<ep.bE1){lines.push(` <b style="color:var(--gold)">WAIT.</b> BUY when price reaches <b class="cg">${f1(ep.bE1)}</b>`);}
+    else{
+      lines.push(`? <b style="color:var(--green)">BUY ACTIVE.</b> Above ${f1(ep.bE1)}`);
+      lines.push(`SL: <b class="cr">${f1(ep.sl)}</b> ? TP1: <b class="cg">${f1(ep.tp1)}</b> ? TP2: <b>${f1(ep.tp2)}</b>`);
+      lines.push(isF?`? FINISH: Close at TP2 max`:`Trail -> TP3 ${f1(ep.tp3)} -> TP4 ${f1(ep.tp4)}`);
+    }
+  } else {
+    if(price>ep.sE1){lines.push(` <b style="color:var(--gold)">WAIT.</b> SELL when price reaches <b class="cr">${f1(ep.sE1)}</b>`);}
+    else{
+      lines.push(`? <b style="color:var(--red)">SELL ACTIVE.</b> Below ${f1(ep.sE1)}`);
+      lines.push(`SL: <b class="cr">${f1(ep.sl)}</b> ? TP1: <b class="cg">${f1(ep.tp1)}</b> ? TP2: <b>${f1(ep.tp2)}</b>`);
+      lines.push(isF?`? FINISH: Close at TP2 max`:`Trail -> TP3 ${f1(ep.tp3)} -> TP4 ${f1(ep.tp4)}`);
+    }
+  }
+  $('na2').innerHTML=lines.map(l=>`<div style="margin-bottom:2px">${l}</div>`).join('');
+}
+
+// ?? RENDER MTF PANEL ??
+function renderMTF(){
+  const{h4,h1}=MTF;
+
+  // DAILY direction from YEST
+  const dailyDir = YEST.close && P.open ?
+    (P.open >= YEST.close ? 'BULL' : 'BEAR') :
+    (YEST.close && YEST.open ? (YEST.close>=YEST.open?'BULL':'BEAR') : '-');
+  const ddEl=$('mtf-daily-dir');
+  if(ddEl){
+    ddEl.textContent=dailyDir;
+    ddEl.className='mtf-dir '+(dailyDir==='BULL'?'mtf-bull':dailyDir==='BEAR'?'mtf-bear':'mtf-neut');
+  }
+  const dtEl=$('mtf-daily-txt');
+  if(dtEl&&YEST.close){
+    dtEl.innerHTML=`Yest: O<b>${f1(YEST.open)}</b> H<b class="cr">${f1(YEST.high)}</b> L<b class="cg">${f1(YEST.low)}</b> C<b>${f1(YEST.close)}</b>`;
+  }
+
+  // 4H candles
+  const c4=$('mtf-4h-candles');
+  if(c4&&h4.candles.length){
+    c4.innerHTML=h4.candles.slice(-5).map(c=>`
+      <div class="mtf-c ${c.dir==='BULL'?'bull':'bear'}">
+        <span class="mtf-cdt">${c.dt}</span>
+        <span class="mtf-cc" style="color:${c.dir==='BULL'?'var(--green)':'var(--red)'}">${f1(c.c)}</span>
+        <span class="mtf-ct" style="color:${c.dir==='BULL'?'var(--green)':'var(--red)'}">${c.dir}</span>
+      </div>`).join('');
+    const d4=$('mtf-4h-dir');
+    if(d4){d4.textContent=h4.trend;d4.className='mtf-dir '+(h4.trend==='BULL'?'mtf-bull':h4.trend==='BEAR'?'mtf-bear':'mtf-neut');}
+  }
+
+  // 1H candles
+  const c1=$('mtf-1h-candles');
+  if(c1&&h1.candles.length){
+    c1.innerHTML=h1.candles.slice(-5).map(c=>`
+      <div class="mtf-c ${c.dir==='BULL'?'bull':'bear'}">
+        <span class="mtf-cdt">${c.dt}</span>
+        <span class="mtf-cc" style="color:${c.dir==='BULL'?'var(--green)':'var(--red)'}">${f1(c.c)}</span>
+        <span class="mtf-ct" style="color:${c.trend==='BUY'?'var(--green)':c.trend==='SELL'?'var(--red)':'var(--dim)'}">${c.trend||c.dir}</span>
+      </div>`).join('');
+    const d1=$('mtf-1h-dir');
+    if(d1){d1.textContent=h1.trend;d1.className='mtf-dir '+(h1.trend==='BUY'||h1.dir==='BULL'?'mtf-bull':h1.trend==='SELL'||h1.dir==='BEAR'?'mtf-bear':'mtf-neut');}
+  }
+
+  // COMPOSITE MTF SIGNAL
+  const ms=$('mtf-signal');
+  if(!ms) return;
+  const d4t=h4.trend, h1t=h1.trend, h1d=h1.dir, dd=dailyDir;
+
+  if(dd==='BULL'&&d4t==='BULL'&&(h1t==='BUY'||h1d==='BULL')){
+    ms.textContent='? STRONG BUY - All 3 TF Aligned UP';ms.className='mtf-signal mtf-strong-buy';
+  } else if(dd==='BEAR'&&d4t==='BEAR'&&(h1t==='SELL'||h1d==='BEAR')){
+    ms.textContent='? STRONG SELL - All 3 TF Aligned DOWN';ms.className='mtf-signal mtf-strong-sell';
+  } else if((dd==='BULL'||d4t==='BULL')&&(h1t==='SELL'||h1d==='BEAR')){
+    ms.textContent=' PULLBACK - Higher TF UP, 1H pulling back. Wait for BUY dip.';ms.className='mtf-signal mtf-pullback';
+  } else if((dd==='BEAR'||d4t==='BEAR')&&(h1t==='BUY'||h1d==='BULL')){
+    ms.textContent=' BOUNCE - Higher TF DOWN, 1H bouncing. Wait for SELL rally.';ms.className='mtf-signal mtf-bounce';
+  } else if(d4t!=='-'&&h1t!=='-'&&d4t!==h1t){
+    ms.textContent='? CONFLICT - 4H vs 1H disagree. Reduce size, wait for clarity.';ms.className='mtf-signal mtf-conflict';
+  } else {
+    ms.textContent='* NEUTRAL - No clear multi-TF alignment yet';ms.className='mtf-signal mtf-neut';
+  }
+}
+
+// ?? MTF SCORE CONTRIBUTION ??
+function getMTFScore(){
+  const{h4,h1}=MTF;
+  const d4=h4.trend, h1t=h1.trend, h1d=h1.dir;
+  let score=0;
+  // 4H alignment
+  if(d4==='BULL') score+=15;
+  else if(d4==='BEAR') score-=15;
+  // 1H trend
+  if(h1t==='BUY'||h1d==='BULL') score+=10;
+  else if(h1t==='SELL'||h1d==='BEAR') score-=10;
+  // All aligned = bonus
+  if(d4==='BULL'&&(h1t==='BUY'||h1d==='BULL')) score+=5;
+  if(d4==='BEAR'&&(h1t==='SELL'||h1d==='BEAR')) score+=5; // both bear = stronger bear
+  return Math.max(-30,Math.min(30,score));
+}
+
+function showDebug(){
+  const info=[
+    'YEST: '+JSON.stringify(YEST),
+    'TODAY_OPEN:'+TODAY_OPEN+' H:'+TODAY_HIGH+' L:'+TODAY_LOW+' C:'+TODAY_CLOSE,
+    '1H rows:'+DATA_1H.length+' 4H rows:'+DATA_4H.length,
+    '1H last keys:'+(DATA_1H.length?Object.keys(DATA_1H[0]).join(','):'-'),
+    '4H last keys:'+(DATA_4H.length?Object.keys(DATA_4H[0]).join(','):'-'),
+    'MTF h4:'+JSON.stringify(MTF.h4.trend)+' h1:'+JSON.stringify(MTF.h1.trend),
+    'P.price:'+P.price,
+  ];
+  alert('DEBUG INFO:\n\n'+info.join('\n'));
+}
+function setTr(v){
+  activeTr=v;
+  ['BULL-BUY','BULL-SELL','BEAR-BUY','BEAR-SELL','NO TRADE'].forEach(t=>
+    $('tc-'+t)?.classList.toggle('active',t===v));
+  recalc();
+}
+
+
+// ======================================================
+// BACKTEST ENGINE
+// ======================================================
+let BT_RESULTS=[];
+let BT_DAILY_ROWS=[];
+let BT_CAL_DATE=new Date(2026,5,1);
+let BT_RUNNING=false;
+
+function openBT(){
+  document.getElementById('bt-overlay').classList.add('show');
+  btRenderCalendar();
+}
+function closeBT(){
+  document.getElementById('bt-overlay').classList.remove('show');
+}
+
+function btFindDailyRow(dateStr){
+  return BT_RESULTS.find(r=>r.date===dateStr)||null;
+}
+
+function btCalcSignal(moonRow, priceRow){
+  const ZODIAC_L={
+    Aries:{bias:'BREAKOUT'},Taurus:{bias:'ACCUMULATION'},Gemini:{bias:'VOLATILE'},
+    Cancer:{bias:'EMOTIONAL'},Leo:{bias:'TREND'},Virgo:{bias:'REVERSAL'},
+    Libra:{bias:'RANGE'},Scorpio:{bias:'SHARP MOVE'},Sagittarius:{bias:'EXPANSION'},
+    Capricorn:{bias:'TREND'},Aquarius:{bias:'UNEXPECTED'},Pisces:{bias:'EXHAUSTION'}
+  };
+  const moonZod=ZODIAC_L[moonRow.ms]||{bias:'NEUTRAL'};
+  const moonBullSigns=['Aries','Leo','Sagittarius','Cancer'];
+  const moonBearSigns=['Capricorn','Scorpio','Virgo'];
+  const cf=65;
+
+  let moonScore=0;
+  if(moonBullSigns.includes(moonRow.ms)) moonScore+=15;
+  else if(moonBearSigns.includes(moonRow.ms)) moonScore-=15;
+  if(moonZod.bias==='TREND') moonScore+=5;
+  if(moonZod.bias==='REVERSAL') moonScore-=5;
+  if(moonRow.cs==='FINISH') moonScore*=0.7;
+
+  let bS=25,sS=0;
+  bS+=moonScore>0?6:0;
+  if(moonRow.cs==='START') bS+=8;
+  if(moonRow.cs==='MOVE') bS+=4;
+  bS+=cf>=70?10:5;
+  bS=Math.min(100,Math.max(0,bS));
+  if(moonRow.cs==='FINISH') sS+=8;
+  if(moonScore<0) sS+=6;
+  sS+=cf>=70?10:5;
+  sS=Math.min(100,Math.max(0,sS));
+
+  const netS=bS-sS;
+  const histS=Math.min(60,30);
+  const transS=30+(moonRow.sn>=3?10:moonRow.sn>=2?5:0)+(moonRow.cs==='FINISH'?-15:moonRow.cs==='MOVE'?5:0);
+  const liveS=20;
+  const totalRaw=moonScore*0.20+histS*0.15+transS*0.15+liveS*0.15;
+  const bias=parseFloat((totalRaw*(netS>=0?1:-1)).toFixed(1));
+
+  const STRONG=25,BUY_T=18,NEUT=7;
+  let signal='* NO TRADE',sigClass='s-nt';
+  let bgColor='rgba(74,96,128,.1)',borderColor='var(--dim)',textColor='var(--dim)';
+  if(bias>=STRONG){signal='? STRONG BUY';sigClass='s-sb';bgColor='rgba(0,255,136,.1)';borderColor='var(--green)';textColor='var(--green)';}
+  else if(bias>=BUY_T){signal='? BUY';sigClass='s-b';bgColor='rgba(0,255,136,.06)';borderColor='#80FFB0';textColor='#80FFB0';}
+  else if(bias<=-STRONG){signal='? STRONG SELL';sigClass='s-ss';bgColor='rgba(255,34,68,.1)';borderColor='var(--red)';textColor='var(--red)';}
+  else if(bias<=-BUY_T){signal='? SELL';sigClass='s-s';bgColor='rgba(255,34,68,.06)';borderColor='#FF9090';textColor='#FF9090';}
+  else if(Math.abs(bias)>=NEUT){signal='* NEUTRAL';sigClass='s-n';bgColor='rgba(255,215,0,.06)';borderColor='var(--gold)';textColor='var(--gold)';}
+
+  const actualDir=priceRow?.dir||'';
+  const isWin=(bias>0&&actualDir==='BULL')||(bias<0&&actualDir==='BEAR');
+  const isLoss=(bias>0&&actualDir==='BEAR')||(bias<0&&actualDir==='BULL');
+
+  return{bias,bS,sS,signal,sigClass,bgColor,borderColor,textColor,isWin,isLoss,moonScore,histS,transS};
+}
+
+async function btLoadDate(dateStr){
+  const inp=document.getElementById('bt-date-input');
+  if(!dateStr) dateStr=inp.value;
+  if(!dateStr) return;
+  const[y,m,d]=dateStr.split('-').map(Number);
+  const moonKey=`${m}/${d}/${y}`;
+  const moonRow=MOON_CSV.find(r=>r.d===moonKey);
+  if(!moonRow){
+    document.getElementById('bt-result-title').textContent=`No astro data for ${dateStr}`;
+    return;
+  }
+  const priceRow=BT_RESULTS.find(r=>r.date===dateStr)||null;
+  document.getElementById('bt-result-title').textContent=`? ${dateStr} - ${moonRow.ms} | ${moonRow.mp} | ${moonRow.cs}`;
+  const result=btCalcSignal(moonRow,priceRow);
+
+  const sigBox=document.getElementById('bt-signal-display');
+  sigBox.textContent=result.signal;
+  sigBox.className='bt-signal-box '+result.sigClass;
+  sigBox.style.background=result.bgColor;
+  sigBox.style.border='1px solid '+result.borderColor;
+  sigBox.style.color=result.textColor;
+
+  document.getElementById('bt-day-stats').innerHTML=`
+    <div class="bt-stat"><div class="bt-sl">BIAS SCORE</div><div class="bt-sv" style="color:${result.bias>0?'var(--green)':result.bias<0?'var(--red)':'var(--gold)'}">${result.bias>0?'+':''}${result.bias}</div></div>
+    <div class="bt-stat"><div class="bt-sl">BUY SCORE</div><div class="bt-sv cg">${result.bS}</div></div>
+    <div class="bt-stat"><div class="bt-sl">SELL SCORE</div><div class="bt-sv cr">${result.sS}</div></div>
+    <div class="bt-stat"><div class="bt-sl">MOON SIGN</div><div class="bt-sv" style="font-size:11px;color:var(--purple)">${moonRow.ms}</div></div>
+    <div class="bt-stat"><div class="bt-sl">CYCLE STAGE</div><div class="bt-sv" style="font-size:11px;color:var(--gold)">${moonRow.cs} #${moonRow.sn}</div></div>
+    <div class="bt-stat"><div class="bt-sl">ACTUAL DIR</div><div class="bt-sv" style="font-size:11px;color:${priceRow?.dir==='BULL'?'var(--green)':priceRow?.dir==='BEAR'?'var(--red)':'var(--dim)'}">${priceRow?.dir||'-'}</div></div>`;
+
+  document.getElementById('bt-day-astro').innerHTML=`
+    <div style="font-size:9px;color:var(--dim);line-height:1.8;background:var(--bg2);border:1px solid var(--border);border-radius:3px;padding:8px 10px">
+      <b style="color:var(--text)">Moon:</b> ${moonRow.mp} in ${moonRow.ms} ? Day #${moonRow.dn} ? ${moonRow.g}<br>
+      <b style="color:var(--text)">Cycle:</b> ${moonRow.cs} Stage ${moonRow.sn}<br>
+      <b style="color:var(--text)">Result:</b> <span style="color:${result.isWin?'var(--green)':result.isLoss?'var(--red)':'var(--dim)'}">${result.isWin?'? WIN':result.isLoss?'? LOSS':'* NO SIGNAL/DATA'}</span>
+    </div>`;
+
+  document.querySelectorAll('.bt-cal-day').forEach(el=>el.classList.remove('selected'));
+  const calEl=document.querySelector(`[data-date="${dateStr}"]`);
+  if(calEl) calEl.classList.add('selected');
+}
+
+async function btRunAll(){
+  if(BT_RUNNING) return;
+  BT_RUNNING=true;
+  BT_RESULTS=[];
+  const prog=document.getElementById('bt-progress');
+  const progTxt=document.getElementById('bt-prog-txt');
+  const progBar=document.getElementById('bt-prog-bar');
+  prog.style.display='block';
+  const today=new Date();
+  const pastRows=MOON_CSV.filter(r=>{
+    const[m,d,y]=r.d.split('/').map(Number);
+    return new Date(y,m-1,d)<today;
+  });
+  document.getElementById('bt-summary-section').style.display='block';
+  document.getElementById('bt-moon-section').style.display='block';
+  document.getElementById('bt-stage-section').style.display='block';
+  document.getElementById('bt-log-section').style.display='block';
+
+  let wins=0,losses=0,noSig=0;
+  const moonStats={},stageStats={};
+
+  for(let i=0;i<pastRows.length;i++){
+    const row=pastRows[i];
+    const[m,d,y]=row.d.split('/').map(Number);
+    const dateStr=`${y}-${String(m).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+    const pct=Math.round((i+1)/pastRows.length*100);
+    progTxt.textContent=`Processing ${dateStr} (${i+1}/${pastRows.length})`;
+    progBar.style.width=pct+'%';
+    const result=btCalcSignal(row,null);
+    const res={date:dateStr,moonSign:row.ms,phase:row.mp,stage:row.cs,stageNum:row.sn,
+      signal:result.signal,bias:result.bias,isWin:result.isWin,isLoss:result.isLoss,dir:'-'};
+    BT_RESULTS.push(res);
+    if(result.isWin) wins++;
+    else if(result.isLoss) losses++;
+    else noSig++;
+    if(!moonStats[row.ms]) moonStats[row.ms]={w:0,l:0};
+    if(result.isWin) moonStats[row.ms].w++;
+    else if(result.isLoss) moonStats[row.ms].l++;
+    if(!stageStats[row.cs]) stageStats[row.cs]={w:0,l:0};
+    if(result.isWin) stageStats[row.cs].w++;
+    else if(result.isLoss) stageStats[row.cs].l++;
+    if(i%20===0) await new Promise(r=>setTimeout(r,0));
+  }
+
+  BT_RUNNING=false;
+  prog.style.display='none';
+  const total=wins+losses+noSig;
+  const wr=wins+losses>0?Math.round(wins/(wins+losses)*100):0;
+
+  document.getElementById('bt-summary-stats').innerHTML=`
+    <div class="bt-stat"><div class="bt-sl">WIN RATE</div><div class="bt-sv" style="color:${wr>=60?'var(--green)':wr>=45?'var(--gold)':'var(--red)'}">${wr}%</div></div>
+    <div class="bt-stat"><div class="bt-sl">TOTAL SIGNALS</div><div class="bt-sv">${wins+losses}</div></div>
+    <div class="bt-stat"><div class="bt-sl">WINS</div><div class="bt-sv cg">${wins}</div></div>
+    <div class="bt-stat"><div class="bt-sl">LOSSES</div><div class="bt-sv cr">${losses}</div></div>
+    <div class="bt-stat"><div class="bt-sl">NO SIGNAL</div><div class="bt-sv cdm">${noSig}</div></div>
+    <div class="bt-stat"><div class="bt-sl">DAYS TESTED</div><div class="bt-sv">${total}</div></div>`;
+
+  const moonArr=Object.entries(moonStats).map(([s,v])=>({
+    s,wr:v.w+v.l>0?Math.round(v.w/(v.w+v.l)*100):0,total:v.w+v.l
+  })).sort((a,b)=>b.wr-a.wr);
+  document.getElementById('bt-moon-stats').innerHTML=moonArr.map(m=>`
+    <div class="bt-moon-bar">
+      <span class="bt-moon-lbl">${m.s}</span>
+      <div class="bt-moon-track"><div class="bt-moon-fill" style="width:${m.wr}%;background:${m.wr>=60?'var(--green)':m.wr>=45?'var(--gold)':'var(--red)'}"></div></div>
+      <span class="bt-moon-pct" style="color:${m.wr>=60?'var(--green)':m.wr>=45?'var(--gold)':'var(--red)'}">${m.wr}% (${m.total})</span>
+    </div>`).join('');
+
+  document.getElementById('bt-stage-stats').innerHTML=Object.entries(stageStats).map(([s,v])=>{
+    const wr2=v.w+v.l>0?Math.round(v.w/(v.w+v.l)*100):0;
+    return`<div class="bt-moon-bar">
+      <span class="bt-moon-lbl">${s}</span>
+      <div class="bt-moon-track"><div class="bt-moon-fill" style="width:${wr2}%;background:${wr2>=60?'var(--green)':wr2>=45?'var(--gold)':'var(--red)'}"></div></div>
+      <span class="bt-moon-pct" style="color:${wr2>=60?'var(--green)':wr2>=45?'var(--gold)':'var(--red)'}">${wr2}%</span>
+    </div>`;
+  }).join('');
+
+  document.getElementById('bt-log-body').innerHTML=BT_RESULTS.slice().reverse().slice(0,150).map(r=>`
+    <tr>
+      <td style="color:var(--dim)">${r.date}</td>
+      <td style="color:var(--purple)">${r.moonSign}</td>
+      <td style="color:var(--dim);font-size:8px">${r.phase}</td>
+      <td style="color:var(--gold)">${r.stage}#${r.stageNum}</td>
+      <td style="color:${r.bias>=25?'var(--green)':r.bias<=-25?'var(--red)':r.bias>=18?'#80FFB0':r.bias<=-18?'#FF9090':'var(--dim)'}">${r.signal}</td>
+      <td style="color:${r.bias>0?'var(--green)':'var(--red)'}">${r.bias>0?'+':''}${r.bias}</td>
+      <td style="color:var(--dim)">${r.dir}</td>
+      <td class="${r.isWin?'bt-win':r.isLoss?'bt-loss':'bt-na'}">${r.isWin?'?WIN':r.isLoss?'?LOSS':'-'}</td>
+    </tr>`).join('');
+
+  btRenderCalendar();
+}
+
+function btRandom(){
+  const today=new Date();
+  const valid=MOON_CSV.filter(r=>{const[m,d,y]=r.d.split('/').map(Number);return new Date(y,m-1,d)<today;});
+  if(!valid.length) return;
+  const rand=valid[Math.floor(Math.random()*valid.length)];
+  const[m,d,y]=rand.d.split('/').map(Number);
+  const ds=`${y}-${String(m).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+  document.getElementById('bt-date-input').value=ds;
+  btLoadDate(ds);
+}
+
+function btRenderCalendar(){
+  const y=BT_CAL_DATE.getFullYear(),m=BT_CAL_DATE.getMonth();
+  const months=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  document.getElementById('bt-cal-month').textContent=`${months[m]} ${y}`;
+  const firstDay=new Date(y,m,1).getDay();
+  const daysInMonth=new Date(y,m+1,0).getDate();
+  let h=['SUN','MON','TUE','WED','THU','FRI','SAT'].map(d=>`<div class="bt-cal-hdr">${d}</div>`).join('');
+  for(let i=0;i<firstDay;i++) h+=`<div></div>`;
+  for(let d2=1;d2<=daysInMonth;d2++){
+    const ds=`${y}-${String(m+1).padStart(2,'0')}-${String(d2).padStart(2,'0')}`;
+    const mk=`${m+1}/${d2}/${y}`;
+    const hasMoon=MOON_CSV.some(r=>r.d===mk);
+    const btR=BT_RESULTS.find(r=>r.date===ds);
+    const wCls=btR?.isWin?'win-day':btR?.isLoss?'loss-day':'';
+    h+=`<div class="bt-cal-day ${hasMoon?'has-data':'no-data'} ${wCls}" data-date="${ds}" onclick="${hasMoon?`btLoadDate('${ds}')`:''}">${d2}</div>`;
+  }
+  document.getElementById('bt-calendar').innerHTML=h;
+}
+
+function btCalPrev(){BT_CAL_DATE.setMonth(BT_CAL_DATE.getMonth()-1);btRenderCalendar();}
+function btCalNext(){BT_CAL_DATE.setMonth(BT_CAL_DATE.getMonth()+1);btRenderCalendar();}
+
+// ======================================================
+// BOOT
+// ======================================================
+today_str_cache = todayStr();
+// When running from localhost server, direct fetches work fine
+const IS_SERVER = window.location.protocol === 'http:' && 
+                  (window.location.hostname === 'localhost' || 
+                   window.location.hostname === '127.0.0.1');
+if(window.location.protocol==='file:'){
+  const n=document.getElementById('cors-notice');
+  if(n){
+    n.style.display='block';
+        n.innerHTML='! GitHub Pages: Fetching data via proxy. Wait 20-30s for sheets. Click FETCH SHEET if needed.';
+  }
+}
+loadTodayAstro();
+renderTransitTicker(todayStr());
+updateYestDisplay();
+fetchSheet(); // auto-fetch all sheets on load
+renderMTF(); // init MTF panel
+
+// Auto-refresh sheet every 5 minutes
+setInterval(fetchSheet, 5*60*1000); // refresh all sheets every 5 min
+</script>
+
+<!-- ══ BACKTEST OVERLAY ══ -->
+<div class="bt-overlay" id="bt-overlay">
+  <div class="bt-header">
+    <div class="bt-logo">📊 BACKTEST -- ADHAM SYSTEM</div>
+    <div style="display:flex;gap:8px;align-items:center">
+      <span id="bt-status" style="font-size:10px;color:var(--dim)">Ready</span>
+      <button class="btn bg" onclick="closeBT()">✕ CLOSE</button>
+    </div>
+  </div>
+  <div class="bt-body">
+
+    <!-- SIDEBAR -->
+    <div class="bt-sidebar">
+      <div class="bt-section">
+        <div class="bt-sh">SELECT DATE</div>
+        <div class="bt-sb">
+          <div class="bt-date-picker">
+            <label>PICK ANY DATE (2026)</label>
+            <input type="date" class="bt-date-input" id="bt-date-input" 
+              min="2026-01-01" max="2026-12-31" value="2026-06-03">
+            <button class="bt-btn bt-btn-gold" onclick="btLoadDate()" style="margin-top:5px">
+              📅 LOAD DATE
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <div class="bt-section">
+        <div class="bt-sh">AUTO BACKTEST</div>
+        <div class="bt-sb" style="display:flex;flex-direction:column;gap:6px">
+          <div style="font-size:9px;color:var(--dim);line-height:1.5">
+            Runs all dates in daily sheet.<br>
+            Compares signal vs actual direction.<br>
+            Shows win rate + best setups.
+          </div>
+          <button class="bt-btn bt-btn-green" onclick="btRunAll()">
+            ▶ RUN FULL BACKTEST
+          </button>
+          <button class="bt-btn bt-btn-blue" onclick="btRandom()">
+            🎲 RANDOM DATE
+          </button>
+          <div class="bt-progress" id="bt-progress" style="display:none">
+            <div style="font-size:9px;color:var(--dim)" id="bt-prog-txt">Processing...</div>
+            <div class="bt-bar-wrap"><div class="bt-bar-fill" id="bt-prog-bar" style="width:0%"></div></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="bt-section">
+        <div class="bt-sh">DATE CALENDAR</div>
+        <div class="bt-sb">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+            <button class="btn bg" onclick="btCalPrev()" style="padding:2px 8px;font-size:10px">◀</button>
+            <span id="bt-cal-month" style="font-size:10px;color:var(--gold);font-weight:700">Jun 2026</span>
+            <button class="btn bg" onclick="btCalNext()" style="padding:2px 8px;font-size:10px">▶</button>
+          </div>
+          <div class="bt-calendar" id="bt-calendar"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- MAIN AREA -->
+    <div class="bt-main">
+
+      <!-- DATE RESULT -->
+      <div class="bt-section" id="bt-date-result">
+        <div class="bt-sh" id="bt-result-title">SELECT A DATE TO VIEW SIGNAL</div>
+        <div class="bt-sb">
+          <div id="bt-signal-display" class="bt-signal-box s-nt" style="background:rgba(74,96,128,.1);border:1px solid var(--dim)">
+            SELECT A DATE
+          </div>
+          <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-top:8px" id="bt-day-stats"></div>
+          <div style="margin-top:8px" id="bt-day-levels"></div>
+          <div style="margin-top:8px" id="bt-day-astro"></div>
+        </div>
+      </div>
+
+      <!-- BACKTEST SUMMARY -->
+      <div class="bt-section" id="bt-summary-section" style="display:none">
+        <div class="bt-sh">BACKTEST RESULTS -- ALL DATES</div>
+        <div class="bt-sb">
+          <div class="bt-stat-grid" id="bt-summary-stats"></div>
+        </div>
+      </div>
+
+      <!-- BEST/WORST BREAKDOWN -->
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+        <div class="bt-section" id="bt-moon-section" style="display:none">
+          <div class="bt-sh">WIN RATE BY MOON SIGN</div>
+          <div class="bt-sb" id="bt-moon-stats"></div>
+        </div>
+        <div class="bt-section" id="bt-stage-section" style="display:none">
+          <div class="bt-sh">WIN RATE BY CYCLE STAGE</div>
+          <div class="bt-sb" id="bt-stage-stats"></div>
+        </div>
+      </div>
+
+      <!-- TRADE LOG TABLE -->
+      <div class="bt-section" id="bt-log-section" style="display:none">
+        <div class="bt-sh">TRADE LOG -- ALL SIGNALS</div>
+        <div style="max-height:300px;overflow-y:auto">
+          <table class="bt-table">
+            <thead><tr>
+              <th>DATE</th><th>MOON</th><th>PHASE</th><th>STAGE</th>
+              <th>SIGNAL</th><th>BIAS</th><th>ACTUAL</th><th>RESULT</th>
+            </tr></thead>
+            <tbody id="bt-log-body"></tbody>
+          </table>
+        </div>
+      </div>
+
+    </div><!-- bt-main -->
+  </div><!-- bt-body -->
+</div><!-- bt-overlay -->
+
+</body>
+</html>

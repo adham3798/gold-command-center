@@ -1,0 +1,72 @@
+{
+  "2026-06-01": [
+    {
+      "time": "10:00",
+      "title": "ISM Manufacturing PMI",
+      "impact": "High"
+    }
+  ],
+  "2026-06-03": [
+    {
+      "time": "08:15",
+      "title": "ADP Non-Farm Employment Change",
+      "impact": "High"
+    },
+    {
+      "time": "10:00",
+      "title": "ISM Services PMI",
+      "impact": "High"
+    }
+  ],
+  "2026-06-05": [
+    {
+      "time": "08:30",
+      "title": "Average Hourly Earnings m/m",
+      "impact": "High"
+    },
+    {
+      "time": "08:30",
+      "title": "Non-Farm Employment Change",
+      "impact": "High"
+    },
+    {
+      "time": "08:30",
+      "title": "Unemployment Rate",
+      "impact": "High"
+    }
+  ],
+  "2026-06-10": [
+    {
+      "time": "08:30",
+      "title": "Core CPI m/m",
+      "impact": "High"
+    },
+    {
+      "time": "08:30",
+      "title": "Core CPI y/y",
+      "impact": "High"
+    },
+    {
+      "time": "08:30",
+      "title": "CPI m/m",
+      "impact": "High"
+    },
+    {
+      "time": "08:30",
+      "title": "CPI y/y",
+      "impact": "High"
+    }
+  ],
+  "2026-06-11": [
+    {
+      "time": "08:30",
+      "title": "Core PPI m/m",
+      "impact": "High"
+    },
+    {
+      "time": "08:30",
+      "title": "PPI m/m",
+      "impact": "High"
+    }
+  ]
+}
