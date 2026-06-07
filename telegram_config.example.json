@@ -1,0 +1,5 @@
+{
+  "_help": "Copy this file to telegram_config.json and fill in bot_token. Get a token from @BotFather in Telegram. Leave chat_id empty, then open your bot and send it any message once — the app finds your chat id automatically. Restart the app after editing.",
+  "bot_token": "PASTE_YOUR_BOT_TOKEN_FROM_BOTFATHER",
+  "chat_id": ""
+}

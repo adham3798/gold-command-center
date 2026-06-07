@@ -8,6 +8,7 @@ import os
 import requests as req
 import engine
 import news
+import notify
 
 app = Flask(__name__)
 import re, urllib.parse
@@ -20,6 +21,7 @@ TRADES_FILE = os.path.join(_HERE, 'trades.json')
 # Portable offline snapshot: written after every successful sheet load, read when offline.
 # Travels with the project (e.g. in the GitHub copy), so the app runs with no internet.
 LOCAL_CACHE = os.path.join(_HERE, 'data_cache.json')
+TG_SENT_FILE = os.path.join(_HERE, 'telegram_sent.json')   # remembers the last alerted date
 DATA = {'prices': {}, 'moon': {}, 'signs': {}, 'phases': {}, 'h1': [], 'h4': [], 'forecast': {}}
 
 # 4-hour candle index (built from DATA['h4']): for the per-day 4H trading plan
@@ -1655,6 +1657,20 @@ def stats():
     })
 
 # ── DASHBOARD SUMMARY ─────────────────────────────────────────────────────────
+@app.route('/api/telegram-test')
+def telegram_test():
+    """Send a test Telegram message — visit /api/telegram-test to check your setup."""
+    if not notify.configured():
+        return jsonify({'ok': False, 'info': 'Not configured. Put your bot token in telegram_config.json.'})
+    ok, info = notify.send('✅ Naser Gold test — your Telegram alerts are working.')
+    return jsonify({'ok': ok, 'info': info, 'chat_id': notify.discover_chat_id()})
+
+@app.route('/api/telegram-decision')
+def telegram_decision():
+    """Force-send the current Decision-Day alert (ignores the once-per-day guard)."""
+    ok, info = check_decision_telegram(force=True)
+    return jsonify({'ok': ok, 'info': info})
+
 @app.route('/api/dashboard')
 def dashboard():
     from datetime import timedelta
@@ -1701,6 +1717,62 @@ def dashboard():
         'decision_alert': decision_alert,
     })
 
+# ── TELEGRAM DECISION-DAY ALERT (end of day) ──────────────────────────────────
+def _tg_sent_load():
+    try:
+        with open(TG_SENT_FILE, encoding='utf-8') as f:
+            return json.load(f)
+    except Exception:
+        return {}
+
+def _tg_sent_save(obj):
+    try:
+        with open(TG_SENT_FILE, 'w', encoding='utf-8') as f:
+            json.dump(obj, f)
+    except Exception as e:
+        print("Telegram-sent save skipped:", e)
+
+def _decision_telegram_message(dd, nday):
+    ch = dd.get('decision_change') or 0
+    L = ['⚠️ <b>DECISION DAY</b> — %s' % dd['date'],
+         'Closed %s$%.2f (within ±$%g) — market undecided, next day is the breakout.'
+         % ('+' if ch >= 0 else '-', abs(ch), DECISION_MAX)]
+    if nday and nday.get('decision_dir'):
+        p = nday.get('plan4h') or {}
+        L += ['', 'Next day <b>%s</b> → <b>%s</b>' % (nday['date'], nday['decision_dir'])]
+        if nday.get('decision_entry') is not None:
+            L.append('Entry 1 (midpoint): $%.2f' % nday['decision_entry'])
+        if p.get('entry2') is not None:
+            L.append('Entry 2 (pivot): $%.2f' % p['entry2'])
+        trig = 'green 1H candle' if nday['decision_dir'] == 'SELL' else 'red 1H candle'
+        L.append('Trigger: %s (whichever comes first)' % trig)
+    return '\n'.join(L)
+
+def check_decision_telegram(force=False):
+    """If the most recent COMPLETED trading day is a Decision Day and we have not yet
+       alerted for it, send a Telegram message (once per date)."""
+    if not notify.configured():
+        return False, 'telegram not configured'
+    days = [d for d in sorted(DATA['prices']) if DATA['prices'][d].get('change') is not None]
+    if not days:
+        return False, 'no price data'
+    last = days[-1]
+    if not _is_decision_day(last):
+        return False, 'last day (%s) is not a decision day' % last
+    sent = _tg_sent_load()
+    if not force and sent.get('last') == last:
+        return False, 'already alerted for %s' % last
+    today = datetime.today().strftime('%Y-%m-%d')
+    nd = _first_trading_day_after(last, today)
+    msg = _decision_telegram_message(build_day(last), build_day(nd) if nd else None)
+    ok, info = notify.send(msg)
+    if ok:
+        _tg_sent_save({'last': last})
+        print("Telegram decision alert sent for", last)
+    else:
+        print("Telegram send failed:", info)
+    return ok, info
+
 import time as _time
 def _auto_refresh_loop(interval=300):
     """Re-pull the Google Sheet + USD news every few minutes so data stays live."""
@@ -1714,6 +1786,10 @@ def _auto_refresh_loop(interval=300):
             news.refresh(timeout=15)
         except Exception as e:
             print("Auto-refresh (news) error:", e)
+        try:
+            check_decision_telegram()
+        except Exception as e:
+            print("Decision Telegram check error:", e)
 
 def _startup_news_refresh():
     try:
@@ -1736,6 +1812,10 @@ def init_app():
     news.load_cache()
     threading.Thread(target=_startup_news_refresh, daemon=True).start()
     threading.Thread(target=_auto_refresh_loop, daemon=True).start()
+    try:
+        check_decision_telegram()      # fire on startup too, if today's close already qualifies
+    except Exception as e:
+        print("Startup Telegram check skipped:", e)
 
 # Initialise on import so production servers (gunicorn) also load data.
 init_app()
