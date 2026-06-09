@@ -423,10 +423,22 @@ def _pullback_direction(date_str, today):
     pm2 = DATA['moon'].get(prev2) if prev2 else None
     if pm2 and pm2.get('sign') == m['sign']:     # this is the 3rd+ day of the run -> not a 2-day pullback
         return None
-    d1 = _base_direction(prev)
+    d1 = _effective_direction(prev, today)   # reverse the prior day's FINAL shown signal
     if d1 == 'BUY':  return 'SELL'
     if d1 == 'SELL': return 'BUY'
     return None
+
+def _effective_direction(ds, today):
+    """The prior day's FINAL shown direction, in the same precedence build_day uses:
+       Decision-Day continuation > 2-day pullback > sheet/engine base. This is what the
+       pullback rule must reverse (not the hidden engine base)."""
+    dc = decision_continuation(ds, today)
+    if dc:
+        return dc['dir']
+    pb = _pullback_direction(ds, today)        # day-1 of a run returns None → no deep recursion
+    if pb:
+        return pb
+    return _base_direction(ds)
 
 # ── NATURE-CYCLE MODEL (v3, backtested ~52% vs 36% baseline) ───────────────────
 # Predicts direction from yesterday's ACTUAL move + today's sign nature + cycle date:
@@ -946,16 +958,20 @@ def _h1_window(date_str):
     return out, days
 
 def build_decision_plan(date_str, dc, today):
-    """Decision-day plan with TWO entries + a 1-HOUR trigger (Option A).
-       Entry 1 = decision-day midpoint, Entry 2 = pivot point. The trade fills on
-       WHICHEVER COMES FIRST: price touches either level, OR the first green 1H candle
-       (for SELL) / red 1H candle (for BUY). Stop/TP sized from 4H ATR, breakeven trail
-       managed on the 1H candles. Returns None if no 1H data (e.g. future days)."""
+    """Decision-day plan with TWO entries — LEVELS FIRST (Option A, refined).
+       Entry 1 = decision-day midpoint, Entry 2 = pivot point.
+       Fill rule: take whichever PRICE LEVEL (pivot/midpoint) price reaches first.
+       ONLY if neither level is reached all day, fall back to the candle trigger
+       (first green candle for SELL / red candle for BUY).
+       Uses 1-hour candles; if the sheet has none for the day (e.g. today), falls back
+       to that day's 4-hour candles. Stop/TP from 4H ATR, breakeven trail on the candles."""
     direction = dc['dir']; sell = direction == 'SELL'
     entry1 = dc['mid']                       # midpoint
     entry2 = _pp_for(date_str)               # pivot
     atr = _h4_atr(date_str)
     win_h1, win_days = _h1_window(date_str)
+    if not win_h1:                            # no 1-hour data -> use 4-hour intraday
+        win_h1, win_days = _h4_window_candles(date_str)
     if atr is None or not win_h1:
         return None
     stop_dist = round(H4_ATR_MULT * atr, 2)
@@ -964,23 +980,27 @@ def build_decision_plan(date_str, dc, today):
     if entry2:
         levels.append(('pivot', round(entry2, 2)))
 
-    # ── Phase 1: find the fill (Option A — first level touch OR first trigger candle) ──
+    # ── Phase 1a: LEVELS FIRST — first candle that reaches either entry level ──
     fill_i = entry = fill_time = fill_type = fill_level = None
     for i, r in enumerate(win_h1):
         if sell:
             touched = [(nm, lv) for nm, lv in levels if r['h'] >= lv]
             if touched:
-                fill_level, entry = max(touched, key=lambda x: x[1]); fill_type = 'level'   # best (highest) sell
-            elif r['c'] >= r['o']:
-                entry = r['c']; fill_type = '1H-green'
+                fill_level, entry = max(touched, key=lambda x: x[1])   # best (highest) sell level
         else:
             touched = [(nm, lv) for nm, lv in levels if r['l'] <= lv]
             if touched:
-                fill_level, entry = min(touched, key=lambda x: x[1]); fill_type = 'level'   # best (lowest) buy
-            elif r['c'] <= r['o']:
-                entry = r['c']; fill_type = '1H-red'
+                fill_level, entry = min(touched, key=lambda x: x[1])   # best (lowest) buy level
         if entry is not None:
-            fill_i = i; fill_time = r['time']; break
+            fill_i = i; fill_time = r['time']; fill_type = 'level'; break
+
+    # ── Phase 1b: BACKUP — only if NO level was reached, use the candle trigger ──
+    if entry is None:
+        for i, r in enumerate(win_h1):
+            if (sell and r['c'] >= r['o']) or ((not sell) and r['c'] <= r['o']):
+                entry = r['c']; fill_i = i; fill_time = r['time']
+                fill_type = '1H-green' if sell else '1H-red'
+                break
 
     is_past = date_str < today
     day_candles = [{**_pub_candle(r), 'tags': []} for r in _H4_BY_DAY.get(date_str, [])]
@@ -1391,6 +1411,9 @@ def live_price():
         today  = datetime.today().strftime('%Y-%m-%d')
         closed = market_closed_reason(today, today)        # weekend / holiday → no running OHLC
         todays = [] if closed else [c for c in DATA.get('h1', []) if str(c.get('dt', '')).startswith(today)]
+        if not todays and not closed:
+            # sheet has no 1-hour data for today yet → use today's 4-hour candles
+            todays = [c for c in DATA.get('h4', []) if str(c.get('dt', '')).startswith(today)]
         t_open = t_high = t_low = None
         if todays:
             t_open = round(todays[0]['open'], 2)
@@ -1700,13 +1723,14 @@ def dashboard():
     if recent:
         last = recent[0]                       # most recent completed trading day
         if last.get('decision_day'):
-            # the next trading day we have a forecast for (the "important" day)
-            nxt = upcoming[0] if upcoming else None
+            # the IMMEDIATE next trading day after the decision day (may be today)
+            nd = _first_trading_day_after(last['date'], today_str)
+            nday = build_day(nd) if nd else None
             decision_alert = {
                 'date': last['date'],
                 'change': last.get('decision_change'),
-                'next_date': nxt['date'] if nxt else None,
-                'next_signal': nxt.get('signal') if nxt else None,
+                'next_date': nd,
+                'next_signal': nday.get('signal') if nday else None,
                 'threshold': DECISION_MAX,
             }
 
