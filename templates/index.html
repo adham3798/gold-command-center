@@ -623,6 +623,13 @@ input,select,textarea{font-family:inherit}
         <div id="pc-result" class="fs-13"><span class="text3">Type a price to check it against today's signal.</span></div>
       </div>
 
+      <!-- Today's Reaction Map — live distance to levels -->
+      <div class="card mb-20">
+        <div class="card-header"><span class="card-title">📍 Reaction Map — live distance to levels</span><span class="text3 fs-11">pivots + mid-levels (M) — reaction zones to expect a bounce/rejection</span></div>
+        <div id="rmap-summary" class="fs-13" style="margin-bottom:10px"><span class="text3">Loading levels…</span></div>
+        <div id="rmap-list"></div>
+      </div>
+
       <!-- Key Levels Reaction Cheat Sheet -->
       <div class="card mb-20">
         <div class="card-header"><span class="card-title">Key Levels — Reaction Cheat Sheet</span><span class="text3 fs-11">holds% = reverses when touched · breaks% = pushes through (all history)</span></div>
@@ -1026,6 +1033,7 @@ async function fetchLive() {
     window.LC = d.last_close || window.LC;                     // PP / midpoint
     window.TODAYLOW = d.today_low; window.TODAYHIGH = d.today_high;   // what today reached
     if (typeof priceCheck === 'function') priceCheck();
+    if (typeof reactionMap === 'function') reactionMap();
     const price = '$' + Number(d.price).toLocaleString('en',{minimumFractionDigits:2,maximumFractionDigits:2});
     const up    = d.change >= 0;
     const chg   = `${up?'+':''}${fmtN(d.change)} (${up?'+':''}${d.change_pct}%)`;
@@ -1063,6 +1071,41 @@ S.liveInterval = setInterval(fetchLive, 30000);
 
 // ── PRICE CHECK — type any price, get buy/don't-buy + SL/TP for today ───────────
 function pcUseLive(){ if(window.LIVEPRICE){ document.getElementById('pc-input').value = window.LIVEPRICE; priceCheck(); } }
+// ── REACTION MAP — today's levels (pivots + mid-levels) with live distance ───────
+function reactionMap(){
+  const sumEl=document.getElementById('rmap-summary'), listEl=document.getElementById('rmap-list');
+  if(!sumEl||!listEl) return;
+  const L=window.LEVELS||[]; const px=window.LIVEPRICE;
+  const g=n=>{const x=L.find(y=>y.name===n);return x?x.price:null;};
+  const PP=g('PP'),R1=g('R1'),R2=g('R2'),R3=g('R3'),S1=g('S1'),S2=g('S2'),S3=g('S3');
+  const MID=window.LC&&window.LC.mid;
+  if(PP==null||px==null){ sumEl.innerHTML='<span class="text3">Levels loading…</span>'; listEl.innerHTML=''; return; }
+  const lv=[]; const add=(n,p)=>{ if(p!=null&&!isNaN(p)) lv.push({n, p:Math.round(p*100)/100}); };
+  add('R3',R3); add('R2',R2); add('R1',R1); add('PP',PP); add('S1',S1); add('S2',S2); add('S3',S3);
+  if(MID!=null) add('Mid (H+L)/2',MID);
+  // mid-levels (M) = midpoint between consecutive main pivots — extra reaction zones
+  [['M R2–R3',R2,R3],['M R1–R2',R1,R2],['M PP–R1',PP,R1],['M S1–PP',S1,PP],['M S2–S1',S2,S1],['M S3–S2',S3,S2]]
+    .forEach(([nm,a,b])=>{ if(a!=null&&b!=null) add(nm,(a+b)/2); });
+  lv.sort((a,b)=>b.p-a.p);                         // high → low
+  const above=lv.filter(x=>x.p>px).sort((a,b)=>a.p-b.p);
+  const below=lv.filter(x=>x.p<px).sort((a,b)=>b.p-a.p);
+  const nr=above[0], ns=below[0];
+  sumEl.innerHTML = `Live <b class="gold">${fmt(px)}</b> &nbsp;·&nbsp; next <span class="sell">▲ resistance</span> `
+    + (nr?`<b>${nr.n} ${fmt(nr.p)}</b> <span class="text3">(+${fmtN(nr.p-px)})</span>`:'—')
+    + ` &nbsp;·&nbsp; next <span class="buy">▼ support</span> `
+    + (ns?`<b>${ns.n} ${fmt(ns.p)}</b> <span class="text3">(−${fmtN(px-ns.p)})</span>`:'—');
+  let rows='', placed=false;
+  const liveRow = `<div class="dp-row" style="background:var(--gold-bg);border-radius:6px"><span class="dr-label gold">●  LIVE PRICE</span><span class="dr-val gold">${fmt(px)}</span></div>`;
+  for(const x of lv){
+    if(!placed && x.p < px){ rows += liveRow; placed=true; }
+    const up = x.p>px, near=(nr&&x.p===nr.p)||(ns&&x.p===ns.p);
+    rows += `<div class="dp-row"${near?' style="background:rgba(245,164,32,.08);border-radius:6px"':''}>`
+      + `<span class="dr-label ${up?'sell':'buy'}">${x.n}${near?(up?' ← next resistance':' ← next support'):''}</span>`
+      + `<span class="dr-val">${fmt(x.p)} <span class="text3 fs-11">${up?'+':'−'}${fmtN(Math.abs(x.p-px))}</span></span></div>`;
+  }
+  if(!placed) rows += liveRow;
+  listEl.innerHTML=rows;
+}
 function pcLvl(name){ const L=(window.LEVELS||[]).find(x=>x.name===name); return L?L.price:null; }
 function priceCheck(){
   const out = document.getElementById('pc-result'); if(!out) return;
@@ -1250,7 +1293,8 @@ async function loadDashboard(_attempt) {
   renderForecastStrip(dash.upcoming);
 
   // Key levels reaction cheat sheet
-  window.LEVELS = (levels && levels.levels) || window.LEVELS;   // pivot levels for the Price Check
+  window.LEVELS = (levels && levels.levels) || window.LEVELS;   // pivot levels for the Price Check / Reaction Map
+  if (typeof reactionMap === 'function') reactionMap();
   renderLevels(levels, (live && live.status==='ok') ? live.price : null);
 
   // Chart
