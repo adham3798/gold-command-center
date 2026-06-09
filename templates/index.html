@@ -590,6 +590,9 @@ input,select,textarea{font-family:inherit}
         </div>
       </div>
 
+      <!-- Live Trade Bias / Flip indicator (two-stage) -->
+      <div class="card mb-20" id="flip-box" style="display:none"></div>
+
       <!-- OHLC Levels: Last Close + Today (live) -->
       <div class="card mb-20">
         <div class="card-header"><span class="card-title">Price Levels — Last Close &amp; Today (live)</span></div>
@@ -1034,6 +1037,7 @@ async function fetchLive() {
     window.TODAYLOW = d.today_low; window.TODAYHIGH = d.today_high; window.TODAYOPEN = d.today_open;   // what today reached
     if (typeof priceCheck === 'function') priceCheck();
     if (typeof reactionMap === 'function') reactionMap();
+    if (typeof flipBias === 'function') flipBias();
     const price = '$' + Number(d.price).toLocaleString('en',{minimumFractionDigits:2,maximumFractionDigits:2});
     const up    = d.change >= 0;
     const chg   = `${up?'+':''}${fmtN(d.change)} (${up?'+':''}${d.change_pct}%)`;
@@ -1071,6 +1075,55 @@ S.liveInterval = setInterval(fetchLive, 30000);
 
 // ── PRICE CHECK — type any price, get buy/don't-buy + SL/TP for today ───────────
 function pcUseLive(){ if(window.LIVEPRICE){ document.getElementById('pc-input').value = window.LIVEPRICE; priceCheck(); } }
+// ── LIVE TRADE BIAS / FLIP (two-stage: weakening at PP, flip at the stop) ────────
+function flipBias(){
+  const el=document.getElementById('flip-box'); if(!el) return;
+  const t=window.TODAY, px=window.LIVEPRICE, PP=window.LC&&window.LC.pp;
+  const dir = t&&t.signal ? (t.signal.indexOf('BUY')>=0?'BUY':(t.signal.indexOf('SELL')>=0?'SELL':null)) : null;
+  if(!t || px==null || PP==null || !dir){ el.style.display='none'; return; }
+  const pl=t.plan4h||{}, stop=pl.stop;
+  const L=window.LEVELS||[]; const g=n=>{const x=L.find(y=>y.name===n);return x?x.price:null;};
+  const Ss=['S1','S2','S3'].map(g).filter(v=>v!=null).sort((a,b)=>b-a);
+  const Rs=['R1','R2','R3'].map(g).filter(v=>v!=null).sort((a,b)=>a-b);
+  const buy = dir==='BUY';
+  let stage, cls, head, body;
+  if(buy){
+    if(px > PP){ stage='intact'; cls='buy'; head='🟢 BUY INTACT';
+      body=`Price ${fmt(px)} is above PP ${fmt(PP)} — buy bias holds. Target R1.`; }
+    else if(stop!=null && px > stop){ stage='weak'; cls='gold'; head='⚠️ BUY WEAKENING';
+      body=`Price ${fmt(px)} dropped <b>below PP ${fmt(PP)}</b>. Tighten up, don’t add — watch the stop ${fmt(stop)}.`; }
+    else { stage='flip'; cls='sell'; head='🔴 FLIPPING TO SELL';
+      const tgt=Ss.filter(s=>s<px)[0], sl=PP+2;
+      body=`Price broke the stop ${fmt(stop)} — <b>BUY is invalidated</b>. SELL setup now: target ${tgt!=null?fmt(tgt):'S1'}, stop $2 above PP ${fmt(sl)}.`; }
+  } else {
+    if(px < PP){ stage='intact'; cls='sell'; head='🟢 SELL INTACT';
+      body=`Price ${fmt(px)} is below PP ${fmt(PP)} — sell bias holds. Target S1.`; }
+    else if(stop!=null && px < stop){ stage='weak'; cls='gold'; head='⚠️ SELL WEAKENING';
+      body=`Price ${fmt(px)} rose <b>above PP ${fmt(PP)}</b>. Tighten up — watch the stop ${fmt(stop)}.`; }
+    else { stage='flip'; cls='buy'; head='🔴 FLIPPING TO BUY';
+      const tgt=Rs.filter(r=>r>px)[0], sl=PP-2;
+      body=`Price broke the stop ${fmt(stop)} — <b>SELL is invalidated</b>. BUY setup now: target ${tgt!=null?fmt(tgt):'R1'}, stop $2 below PP ${fmt(sl)}.`; }
+  }
+  const color = cls==='buy'?'var(--buy)':cls==='sell'?'var(--sell)':'var(--gold)';
+  el.style.display='block'; el.style.borderLeft='4px solid '+color;
+  el.innerHTML = `<div class="card-header"><span class="card-title">🔄 Live Trade Bias — ${dir} day</span><span class="text3 fs-11">stage 1: below PP · stage 2: stop break</span></div>`
+    + `<div class="${cls}" style="font-weight:800;font-size:16px;margin-bottom:6px">${head}</div>`
+    + `<div class="text2" style="line-height:1.6">${body}</div>`;
+  notifyFlip(stage, head, body);
+}
+function notifyFlip(stage, head, body){
+  try{
+    if(stage==='intact'){ window.__flipStage='intact'; return; }
+    if(window.__flipStage===stage) return;          // only on a stage change
+    window.__flipStage=stage;
+    if(!('Notification' in window)) return;
+    const txt=String(body).replace(/<[^>]+>/g,'');
+    const fire=()=>{ new Notification('🔄 Gold — '+head, {body:txt}); };
+    if(Notification.permission==='granted') fire();
+    else if(Notification.permission!=='denied') Notification.requestPermission().then(p=>{ if(p==='granted') fire(); });
+  }catch(e){}
+}
+
 // ── REACTION MAP — today's levels (pivots + mid-levels) with live distance ───────
 function reactionMap(){
   const sumEl=document.getElementById('rmap-summary'), listEl=document.getElementById('rmap-list');
@@ -1254,8 +1307,9 @@ async function loadDashboard(_attempt) {
 
   // Today signal card
   const t = dash.today;
-  window.TODAY = t;                       // for the Price Check box
+  window.TODAY = t;                       // for the Price Check box / flip bias
   if (typeof priceCheck === 'function') priceCheck();
+  if (typeof flipBias === 'function') flipBias();
   const sigCard = document.getElementById('d-signal-card');
   if (t.market_closed) {
     sigCard.style.borderTop = '3px solid var(--nd)';
