@@ -601,6 +601,7 @@ input,select,textarea{font-family:inherit}
             <div class="dp-row"><span class="dr-label">Low</span><span class="dr-val sell" id="lc-l">—</span></div>
             <div class="dp-row"><span class="dr-label">Close</span><span class="dr-val" id="lc-c">—</span></div>
             <div class="dp-row" style="border-top:1px solid var(--border);margin-top:4px;padding-top:8px"><span class="dr-label">Midpoint (H+L)/2</span><span class="dr-val gold" id="lc-mid">—</span></div>
+            <div class="dp-row"><span class="dr-label">PP — Pivot Point (H+L+C)/3</span><span class="dr-val gold" id="lc-pp">—</span></div>
           </div>
           <div>
             <div class="text2 fs-12 mb-8" style="font-weight:700;letter-spacing:.5px">Today <span class="text3" style="font-weight:400">(running)</span></div>
@@ -609,6 +610,17 @@ input,select,textarea{font-family:inherit}
             <div class="dp-row"><span class="dr-label">Low until now</span><span class="dr-val sell" id="td-l">—</span></div>
           </div>
         </div>
+      </div>
+
+      <!-- Price Check — should I enter at this price? -->
+      <div class="card mb-20">
+        <div class="card-header"><span class="card-title">Price Check — should I enter here?</span><span class="text3 fs-11" id="pc-hint"></span></div>
+        <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:12px">
+          <input id="pc-input" type="number" step="0.01" placeholder="Type a price, e.g. 4340" oninput="priceCheck()"
+            style="background:var(--card2);border:1px solid var(--border);border-radius:8px;color:var(--text);padding:10px 12px;font-size:16px;width:200px;font-variant-numeric:tabular-nums">
+          <button class="btn btn-sm" onclick="pcUseLive()">Use live price</button>
+        </div>
+        <div id="pc-result" class="fs-13"><span class="text3">Type a price to check it against today's signal.</span></div>
       </div>
 
       <!-- Key Levels Reaction Cheat Sheet -->
@@ -1010,6 +1022,7 @@ async function fetchLive() {
   try {
     const d = await fetch('/api/live-price').then(r => r.json());
     if (d.status === 'error') return;
+    window.LIVEPRICE = (d && d.price) || window.LIVEPRICE;     // for the Price Check box
     const price = '$' + Number(d.price).toLocaleString('en',{minimumFractionDigits:2,maximumFractionDigits:2});
     const up    = d.change >= 0;
     const chg   = `${up?'+':''}${fmtN(d.change)} (${up?'+':''}${d.change_pct}%)`;
@@ -1032,7 +1045,7 @@ async function fetchLive() {
       const lc = d.last_close;
       const lcd = document.getElementById('d-lc-date');
       if (lcd) lcd.textContent = 'Last Close · ' + new Date(lc.date+'T12:00').toLocaleDateString('en',{weekday:'short',month:'short',day:'numeric'});
-      setT('lc-o', lc.open); setT('lc-h', lc.high); setT('lc-l', lc.low); setT('lc-c', lc.close); setT('lc-mid', lc.mid);
+      setT('lc-o', lc.open); setT('lc-h', lc.high); setT('lc-l', lc.low); setT('lc-c', lc.close); setT('lc-mid', lc.mid); setT('lc-pp', lc.pp);
     }
     if (d.market_closed) {
       // weekend / holiday → no running session
@@ -1044,6 +1057,49 @@ async function fetchLive() {
 }
 fetchLive();
 S.liveInterval = setInterval(fetchLive, 30000);
+
+// ── PRICE CHECK — type any price, get buy/don't-buy + SL/TP for today ───────────
+function pcUseLive(){ if(window.LIVEPRICE){ document.getElementById('pc-input').value = window.LIVEPRICE; priceCheck(); } }
+function priceCheck(){
+  const out = document.getElementById('pc-result'); if(!out) return;
+  const t = window.TODAY;
+  const raw = (document.getElementById('pc-input')||{}).value || '';
+  const px = parseFloat(raw);
+  const dir = t && t.signal ? (t.signal.indexOf('BUY')>=0?'BUY':(t.signal.indexOf('SELL')>=0?'SELL':null)) : null;
+  const hint = document.getElementById('pc-hint');
+  if (hint) hint.innerHTML = !t ? '' : (dir ? `today: <span class="${dir==='BUY'?'buy':'sell'}">${dir}</span>` : 'today: no trade signal');
+  if (!t){ out.innerHTML = '<span class="text3">Loading today’s data…</span>'; return; }
+  if (!dir){ out.innerHTML = '<span class="text3">Today has no BUY/SELL signal — nothing to check.</span>'; return; }
+  if (raw==='' || isNaN(px)){ out.innerHTML = '<span class="text3">Type a price above to check it against today’s '+dir+'.</span>'; return; }
+  const pl = t.plan4h || {};
+  const entry = (pl.entry!=null) ? pl.entry : (pl.entry2!=null ? pl.entry2 : pl.entry1);
+  const mid   = (pl.entry1!=null) ? pl.entry1 : null;
+  const sd = pl.stop_dist, td = pl.tp_dist;
+  if (entry==null || !sd){ out.innerHTML = '<span class="text3">No entry levels for today yet (no plan).</span>'; return; }
+  const buy = dir==='BUY';
+  const stopLvl = buy ? entry - sd : entry + sd;
+  const tgtLvl  = buy ? entry + td : entry - td;
+  const sl = buy ? px - sd : px + sd;
+  const tp = buy ? px + td : px - td;
+  let sugg = 'Suggested entry: <b>'+fmt(entry)+'</b> (pivot)';
+  if (mid!=null && Math.abs(mid-entry) > 0.01) sugg += ' or <b>'+fmt(mid)+'</b> (midpoint, deeper)';
+  const sltp = `If you ${dir.toLowerCase()} at ${fmt(px)}: <span class="sell">Stop ${fmt(sl)}</span> · <span class="buy">Take-profit ${fmt(tp)}</span> (1:1).`;
+  let verdict, cls, body='';
+  const pastStop = buy ? (px <= stopLvl) : (px >= stopLvl);
+  const inZone   = buy ? (px <= entry)   : (px >= entry);
+  const beforeTgt= buy ? (px <  tgtLvl)  : (px >  tgtLvl);
+  if (pastStop){
+    verdict = `✗ DON’T ${dir} — ${buy?'below':'above'} the stop ${fmt(stopLvl)} (setup invalid).`; cls='sell';
+  } else if (inZone){
+    verdict = `✓ GOOD ${dir} — at/${buy?'below':'above'} the entry ${fmt(entry)}.`; cls='buy'; body = sltp;
+  } else if (beforeTgt){
+    verdict = `⚠ CHASING — ${fmt(px)} is ${buy?'above':'below'} today’s entry ${fmt(entry)}. Wait for the pullback.`; cls='gold';
+    body = sugg + '.<br>' + sltp;
+  } else {
+    verdict = `✗ DON’T ${dir} — target ${fmt(tgtLvl)} already reached, no room left.`; cls='sell';
+  }
+  out.innerHTML = `<div class="${cls}" style="font-weight:800;margin-bottom:6px;line-height:1.5">${verdict}</div>${body?`<div class="text2" style="line-height:1.6">${body}</div>`:''}`;
+}
 
 // ── PRICE CHART ────────────────────────────────────────────────────────────────
 let chartDays = 90;
@@ -1129,6 +1185,8 @@ async function loadDashboard(_attempt) {
 
   // Today signal card
   const t = dash.today;
+  window.TODAY = t;                       // for the Price Check box
+  if (typeof priceCheck === 'function') priceCheck();
   const sigCard = document.getElementById('d-signal-card');
   if (t.market_closed) {
     sigCard.style.borderTop = '3px solid var(--nd)';

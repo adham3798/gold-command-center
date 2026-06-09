@@ -1390,13 +1390,16 @@ def live_price():
             ld = dates_sorted[-1]
             lp = DATA['prices'][ld]
             mid = round((lp['high'] + lp['low']) / 2, 2) if (lp.get('high') and lp.get('low')) else None
+            # Pivot Point (PP) = (High + Low + Close) / 3 — the day's pivot / tomorrow's entry level
+            pp = round((lp['high'] + lp['low'] + lp['close']) / 3, 2) if (
+                lp.get('high') is not None and lp.get('low') is not None and lp.get('close') is not None) else None
             close_val = lp['close']
             if closed and current:
                 # market shut → the live spot IS that day's true last-traded close
                 close_val = round(current, 2)
             last_close = {
                 'date': ld, 'open': lp['open'], 'high': lp['high'],
-                'low': lp['low'], 'close': close_val, 'mid': mid,
+                'low': lp['low'], 'close': close_val, 'mid': mid, 'pp': pp,
                 'direction': lp['direction'],
             }
             if closed and len(dates_sorted) >= 2:
