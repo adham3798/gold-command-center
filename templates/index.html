@@ -1031,7 +1031,7 @@ async function fetchLive() {
     if (d.status === 'error') return;
     window.LIVEPRICE = (d && d.price) || window.LIVEPRICE;     // for the Price Check box
     window.LC = d.last_close || window.LC;                     // PP / midpoint
-    window.TODAYLOW = d.today_low; window.TODAYHIGH = d.today_high;   // what today reached
+    window.TODAYLOW = d.today_low; window.TODAYHIGH = d.today_high; window.TODAYOPEN = d.today_open;   // what today reached
     if (typeof priceCheck === 'function') priceCheck();
     if (typeof reactionMap === 'function') reactionMap();
     const price = '$' + Number(d.price).toLocaleString('en',{minimumFractionDigits:2,maximumFractionDigits:2});
@@ -1083,6 +1083,9 @@ function reactionMap(){
   const lv=[]; const add=(n,p)=>{ if(p!=null&&!isNaN(p)) lv.push({n, p:Math.round(p*100)/100}); };
   add('R3',R3); add('R2',R2); add('R1',R1); add('PP',PP); add('S1',S1); add('S2',S2); add('S3',S3);
   if(MID!=null) add('Mid (H+L)/2',MID);
+  // prior-day & today reference levels (frequently-touched magnets, e.g. ~4325 = prev close)
+  if(window.LC){ add('Prev Close',window.LC.close); add('Prev Open',window.LC.open); }
+  if(window.TODAYOPEN!=null) add('Today Open',window.TODAYOPEN);
   // mid-levels (M) = midpoint between consecutive main pivots — extra reaction zones
   [['M R2–R3',R2,R3],['M R1–R2',R1,R2],['M PP–R1',PP,R1],['M S1–PP',S1,PP],['M S2–S1',S2,S1],['M S3–S2',S3,S2]]
     .forEach(([nm,a,b])=>{ if(a!=null&&b!=null) add(nm,(a+b)/2); });
