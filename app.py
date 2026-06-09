@@ -847,22 +847,78 @@ def _h4_window_candles(date_str):
         out.extend(_H4_BY_DAY[d])
     return out, days
 
+def _pivot_levels(date_str):
+    """Pivot ladder for date_str, from the most recent prior trading day's OHLC."""
+    prior = [d for d in sorted(DATA['prices']) if d < date_str and None not in (
+        DATA['prices'][d].get('high'), DATA['prices'][d].get('low'), DATA['prices'][d].get('close'))]
+    if not prior:
+        return None
+    y = DATA['prices'][prior[-1]]
+    p = {k: round(v, 2) for k, v in _pivots_from(y).items()}   # R1/R2/R3, PP, S1/S2/S3, Yest High/Low
+    p['MID'] = round((y['high'] + y['low']) / 2, 2)            # midpoint (rounded to match entries)
+    return p
+
+# pivot ladder used for level-based stops (R/PP/MID/S — Yest High/Low excluded on purpose)
+_LADDER = ('R3', 'R2', 'R1', 'PP', 'MID', 'S1', 'S2', 'S3')
+_LV_NAME = {'MID': 'midpoint', 'PP': 'PP'}
+
+def _level_sltp(direction, entry, lv):
+    """(stop, target, stop_ref, target_ref) — rule (ii): stop $2 beyond the NEXT
+       pivot level past the entry; target = next R (buy) / next S (sell)."""
+    entry = round(entry, 2)                   # match the 2dp pivot levels (avoid rounding slips)
+    ladder = [(k, lv[k]) for k in _LADDER if lv.get(k) is not None]
+    Rs = [(k, lv[k]) for k in ('R1', 'R2', 'R3') if lv.get(k) is not None]
+    Ss = [(k, lv[k]) for k in ('S1', 'S2', 'S3') if lv.get(k) is not None]
+    if direction == 'BUY':
+        below = [(k, v) for k, v in ladder if v < entry - 1e-6]
+        if not below:
+            return None, None, None, None
+        sk, sv = max(below, key=lambda x: x[1])          # nearest level below entry
+        above = [(k, v) for k, v in Rs if v > entry + 1e-6]
+        tk, tv = min(above, key=lambda x: x[1]) if above else (None, None)
+        return round(sv - 2, 2), (round(tv, 2) if tv is not None else None), _LV_NAME.get(sk, sk), tk
+    else:
+        above = [(k, v) for k, v in ladder if v > entry + 1e-6]
+        if not above:
+            return None, None, None, None
+        rk, rv = min(above, key=lambda x: x[1])          # nearest level above entry
+        below = [(k, v) for k, v in Ss if v < entry - 1e-6]
+        tk, tv = max(below, key=lambda x: x[1]) if below else (None, None)
+        return round(rv + 2, 2), (round(tv, 2) if tv is not None else None), _LV_NAME.get(rk, rk), tk
+
+def _plan_sltp(date_str, direction, entry, atr):
+    """Stop/target for the plan. Level-based (rule ii); ATR-based 1:1 only as a fallback
+       when the pivot ladder can't supply both a stop and a target.
+       Returns (stop, target, be, stop_ref, target_ref)."""
+    lv = _pivot_levels(date_str)
+    stop = tgt = sref = tref = None
+    if lv:
+        stop, tgt, sref, tref = _level_sltp(direction, entry, lv)
+    if stop is None or tgt is None:           # fallback: 1.5×ATR, 1:1
+        sd = round(H4_ATR_MULT * atr, 2) if atr else None
+        if sd:
+            if direction == 'BUY':
+                stop, tgt = round(entry - sd, 2), round(entry + sd, 2)
+            else:
+                stop, tgt = round(entry + sd, 2), round(entry - sd, 2)
+            sref = sref or ('%g×ATR' % H4_ATR_MULT); tref = tref or '1:1'
+    be = round(entry + 0.5 * (tgt - entry), 2) if (stop is not None and tgt is not None) else None
+    return stop, tgt, be, sref, tref
+
 def build_4h_plan(date_str, direction, today, entry=None, entry_label='pivot point'):
     """Build the per-day 4-hour plan dict, or None if not applicable.
        direction: 'BUY' or 'SELL'. Entry defaults to the pivot, but a decision-day
-       midpoint can be passed in. Stop/TP from 4H ATR. BE trail on 4H."""
+       midpoint can be passed in. Stop/target = pivot levels (rule ii). BE trail on 4H."""
     if entry is None:
         entry = _pp_for(date_str)
     atr = _h4_atr(date_str)
-    if entry is None or not atr:
+    if entry is None:
         return None
     buy = direction == 'BUY'
-    stop_dist = round(H4_ATR_MULT * atr, 2)
-    tp_dist   = round(H4_RR * stop_dist, 2)
-    if buy:
-        sl = entry - stop_dist; tgt = entry + tp_dist; be = entry + 0.5 * tp_dist
-    else:
-        sl = entry + stop_dist; tgt = entry - tp_dist; be = entry - 0.5 * tp_dist
+    sl, tgt, be, stop_ref, target_ref = _plan_sltp(date_str, direction, entry, atr)
+    if sl is None or tgt is None or be is None:
+        return None
+    stop_dist = round(abs(entry - sl), 2); tp_dist = round(abs(tgt - entry), 2)
 
     day_candles = _H4_BY_DAY.get(date_str, [])
     win_candles, win_days = _h4_window_candles(date_str)
@@ -919,8 +975,8 @@ def build_4h_plan(date_str, direction, today, entry=None, entry_label='pivot poi
     return {
         'dir': direction, 'entry': round(entry, 2), 'entry_label': entry_label,
         'stop': round(sl, 2), 'target': round(tgt, 2), 'be': round(be, 2),
-        'atr': round(atr, 2), 'stop_dist': stop_dist, 'tp_dist': tp_dist,
-        'atr_mult': H4_ATR_MULT, 'rr': '%g:1' % H4_RR,
+        'atr': round(atr, 2) if atr else None, 'stop_dist': stop_dist, 'tp_dist': tp_dist,
+        'stop_ref': stop_ref, 'target_ref': target_ref,
         'filled': filled, 'fill_time': fill_time, 'outcome': outcome,
         'candles': tagged, 'n_candles': len(day_candles),
         'advice': advice,
@@ -946,7 +1002,7 @@ def _h4_advice(direction, entry, sl, tgt, filled, fill_time, outcome, is_past, i
                     'Managing on 4H with a move-to-breakeven trail.' % (direction, e, fill_time or '', s, t))
         return 'WAITING — enter %s only when price trades to the pivot %s. Then stop %s, target %s.' % (direction, e, s, t)
     # future
-    return ('PLAN — when price trades to the pivot %s, go %s. Stop %s, target %s (1:1), '
+    return ('PLAN — when price trades to the pivot %s, go %s. Stop %s, target %s, '
             'trailed to breakeven on the 4H candles.' % (e, direction, s, t))
 
 def _h1_window(date_str):
@@ -974,8 +1030,6 @@ def build_decision_plan(date_str, dc, today):
         win_h1, win_days = _h4_window_candles(date_str)
     if atr is None or not win_h1:
         return None
-    stop_dist = round(H4_ATR_MULT * atr, 2)
-    tp_dist   = round(H4_RR * stop_dist, 2)
     levels = [('midpoint', round(entry1, 2))]
     if entry2:
         levels.append(('pivot', round(entry2, 2)))
@@ -1011,13 +1065,15 @@ def build_decision_plan(date_str, dc, today):
         return {'dir': direction, 'decision': True, 'entry1': round(entry1, 2),
                 'entry2': round(entry2, 2) if entry2 else None, 'entry': None, 'filled': False,
                 'fill_type': None, 'fill_level': None, 'fill_time': None,
-                'stop': None, 'target': None, 'be': None, 'atr': round(atr, 2),
-                'stop_dist': stop_dist, 'tp_dist': tp_dist, 'atr_mult': H4_ATR_MULT, 'rr': '%g:1' % H4_RR,
+                'stop': None, 'target': None, 'be': None, 'stop_ref': None, 'target_ref': None,
                 'outcome': 'NF' if is_past else None, 'candles': day_candles,
                 'n_candles': len(day_candles), 'trigger': trig, 'advice': adv}
 
-    if sell: stop0, be, tgt = entry + stop_dist, entry - 0.5*tp_dist, entry - tp_dist
-    else:    stop0, be, tgt = entry - stop_dist, entry + 0.5*tp_dist, entry + tp_dist
+    # stop/target from the pivot ladder (rule ii): stop $2 below the next level under
+    # the entry, target = next R (buy) / next S (sell)
+    stop0, tgt, be, stop_ref, target_ref = _plan_sltp(date_str, direction, entry, atr)
+    if stop0 is None or tgt is None or be is None:
+        return None
 
     # ── Phase 2: breakeven-trail management on the 1H candles after the fill ──
     armed = False; outcome = None
@@ -1051,8 +1107,8 @@ def build_decision_plan(date_str, dc, today):
             'entry': round(entry, 2), 'entry_label': entry_label, 'filled': True,
             'fill_type': fill_type, 'fill_level': fill_level, 'fill_time': fill_time,
             'stop': round(stop0, 2), 'target': round(tgt, 2), 'be': round(be, 2),
-            'atr': round(atr, 2), 'stop_dist': stop_dist, 'tp_dist': tp_dist,
-            'atr_mult': H4_ATR_MULT, 'rr': '%g:1' % H4_RR, 'outcome': outcome,
+            'stop_dist': round(abs(entry-stop0), 2), 'tp_dist': round(abs(tgt-entry), 2),
+            'stop_ref': stop_ref, 'target_ref': target_ref, 'outcome': outcome,
             'candles': day_candles, 'n_candles': len(day_candles),
             'trigger': trig, 'advice': adv}
 

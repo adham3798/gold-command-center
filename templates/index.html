@@ -1023,6 +1023,9 @@ async function fetchLive() {
     const d = await fetch('/api/live-price').then(r => r.json());
     if (d.status === 'error') return;
     window.LIVEPRICE = (d && d.price) || window.LIVEPRICE;     // for the Price Check box
+    window.LC = d.last_close || window.LC;                     // PP / midpoint
+    window.TODAYLOW = d.today_low; window.TODAYHIGH = d.today_high;   // what today reached
+    if (typeof priceCheck === 'function') priceCheck();
     const price = '$' + Number(d.price).toLocaleString('en',{minimumFractionDigits:2,maximumFractionDigits:2});
     const up    = d.change >= 0;
     const chg   = `${up?'+':''}${fmtN(d.change)} (${up?'+':''}${d.change_pct}%)`;
@@ -1060,6 +1063,7 @@ S.liveInterval = setInterval(fetchLive, 30000);
 
 // ── PRICE CHECK — type any price, get buy/don't-buy + SL/TP for today ───────────
 function pcUseLive(){ if(window.LIVEPRICE){ document.getElementById('pc-input').value = window.LIVEPRICE; priceCheck(); } }
+function pcLvl(name){ const L=(window.LEVELS||[]).find(x=>x.name===name); return L?L.price:null; }
 function priceCheck(){
   const out = document.getElementById('pc-result'); if(!out) return;
   const t = window.TODAY;
@@ -1071,32 +1075,51 @@ function priceCheck(){
   if (!t){ out.innerHTML = '<span class="text3">Loading today’s data…</span>'; return; }
   if (!dir){ out.innerHTML = '<span class="text3">Today has no BUY/SELL signal — nothing to check.</span>'; return; }
   if (raw==='' || isNaN(px)){ out.innerHTML = '<span class="text3">Type a price above to check it against today’s '+dir+'.</span>'; return; }
-  const pl = t.plan4h || {};
-  const entry = (pl.entry!=null) ? pl.entry : (pl.entry2!=null ? pl.entry2 : pl.entry1);
-  const mid   = (pl.entry1!=null) ? pl.entry1 : null;
-  const sd = pl.stop_dist, td = pl.tp_dist;
-  if (entry==null || !sd){ out.innerHTML = '<span class="text3">No entry levels for today yet (no plan).</span>'; return; }
+
+  const PP = (window.LC&&window.LC.pp), MID = (window.LC&&window.LC.mid);
+  const tlow = window.TODAYLOW, thigh = window.TODAYHIGH;
+  if (PP==null || MID==null){ out.innerHTML = '<span class="text3">No pivot levels for today yet.</span>'; return; }
   const buy = dir==='BUY';
-  const stopLvl = buy ? entry - sd : entry + sd;
-  const tgtLvl  = buy ? entry + td : entry - td;
-  const sl = buy ? px - sd : px + sd;
-  const tp = buy ? px + td : px - td;
-  let sugg = 'Suggested entry: <b>'+fmt(entry)+'</b> (pivot)';
-  if (mid!=null && Math.abs(mid-entry) > 0.01) sugg += ' or <b>'+fmt(mid)+'</b> (midpoint, deeper)';
-  const sltp = `If you ${dir.toLowerCase()} at ${fmt(px)}: <span class="sell">Stop ${fmt(sl)}</span> · <span class="buy">Take-profit ${fmt(tp)}</span> (1:1).`;
+  const refs = [['PP',PP],['midpoint',MID]];
+  const Rs = ['R1','R2','R3'].map(pcLvl).filter(v=>v!=null).sort((a,b)=>a-b);
+  const Ss = ['S1','S2','S3'].map(pcLvl).filter(v=>v!=null).sort((a,b)=>b-a);
+  const BUF = 2;   // stop sits $2 beyond the level
+
   let verdict, cls, body='';
-  const pastStop = buy ? (px <= stopLvl) : (px >= stopLvl);
-  const inZone   = buy ? (px <= entry)   : (px >= entry);
-  const beforeTgt= buy ? (px <  tgtLvl)  : (px >  tgtLvl);
-  if (pastStop){
-    verdict = `✗ DON’T ${dir} — ${buy?'below':'above'} the stop ${fmt(stopLvl)} (setup invalid).`; cls='sell';
-  } else if (inZone){
-    verdict = `✓ GOOD ${dir} — at/${buy?'below':'above'} the entry ${fmt(entry)}.`; cls='buy'; body = sltp;
-  } else if (beforeTgt){
-    verdict = `⚠ CHASING — ${fmt(px)} is ${buy?'above':'below'} today’s entry ${fmt(entry)}. Wait for the pullback.`; cls='gold';
-    body = sugg + '.<br>' + sltp;
+  if (buy){
+    // supports below the entry that today's LOW actually reached
+    const cand = refs.filter(([n,L]) => L < px && tlow!=null && tlow <= L);
+    const tgt  = Rs.filter(r => r > px)[0];
+    if (!cand.length){
+      cls='gold';
+      verdict = `⚠ WAIT — support not tested yet. Price hasn’t dipped to PP ${fmt(PP)} or midpoint ${fmt(MID)} today, so there’s no confirmed support to anchor a stop. Wait for a dip to those levels.`;
+    } else {
+      cand.sort((a,b)=>a[1]-b[1]);                 // lowest tested support first
+      const [refName, refLvl] = cand[0];
+      const sl = refLvl - BUF;
+      cls='buy'; verdict = `✓ BUY ${fmt(px)} — ${refName} ${fmt(refLvl)} held today (support tested).`;
+      const risk = px - sl, reward = tgt!=null ? (tgt - px) : null;
+      body = `Stop = $2 below ${refName} → <span class="sell">${fmt(sl)}</span>`
+           + (tgt!=null ? ` · Take-profit = next resistance → <span class="buy">${fmt(tgt)}</span>` : ` · <span class="text3">no resistance level above — set your own target</span>`)
+           + (reward!=null ? `<br><span class="text3">Risk ${fmtN(risk)} · Reward ${fmtN(reward)} · R:R ${ (reward/risk).toFixed(2) }:1</span>` : '');
+    }
   } else {
-    verdict = `✗ DON’T ${dir} — target ${fmt(tgtLvl)} already reached, no room left.`; cls='sell';
+    // resistances above the entry that today's HIGH actually reached
+    const cand = refs.filter(([n,L]) => L > px && thigh!=null && thigh >= L);
+    const tgt  = Ss.filter(s => s < px)[0];
+    if (!cand.length){
+      cls='gold';
+      verdict = `⚠ WAIT — resistance not tested yet. Price hasn’t risen to PP ${fmt(PP)} or midpoint ${fmt(MID)} today, so there’s no confirmed resistance to anchor a stop. Wait for a rally to those levels.`;
+    } else {
+      cand.sort((a,b)=>b[1]-a[1]);                 // highest tested resistance first
+      const [refName, refLvl] = cand[0];
+      const sl = refLvl + BUF;
+      cls='sell'; verdict = `✓ SELL ${fmt(px)} — ${refName} ${fmt(refLvl)} capped today (resistance tested).`;
+      const risk = sl - px, reward = tgt!=null ? (px - tgt) : null;
+      body = `Stop = $2 above ${refName} → <span class="sell">${fmt(sl)}</span>`
+           + (tgt!=null ? ` · Take-profit = next support → <span class="buy">${fmt(tgt)}</span>` : ` · <span class="text3">no support level below — set your own target</span>`)
+           + (reward!=null ? `<br><span class="text3">Risk ${fmtN(risk)} · Reward ${fmtN(reward)} · R:R ${ (reward/risk).toFixed(2) }:1</span>` : '');
+    }
   }
   out.innerHTML = `<div class="${cls}" style="font-weight:800;margin-bottom:6px;line-height:1.5">${verdict}</div>${body?`<div class="text2" style="line-height:1.6">${body}</div>`:''}`;
 }
@@ -1227,6 +1250,7 @@ async function loadDashboard(_attempt) {
   renderForecastStrip(dash.upcoming);
 
   // Key levels reaction cheat sheet
+  window.LEVELS = (levels && levels.levels) || window.LEVELS;   // pivot levels for the Price Check
   renderLevels(levels, (live && live.status==='ok') ? live.price : null);
 
   // Chart
@@ -1627,10 +1651,9 @@ async function openDetail(dateStr) {
         <div class="dp-row"><span class="dr-label">Action</span><span class="dr-val ${pl.dir==='BUY'?'buy':'sell'}">${pl.dir==='BUY'?'▲ BUY':'▼ SELL'} at the pivot</span></div>
         <div class="dp-row"><span class="dr-label">Entry — ${pl.entry_label||'pivot point'}</span><span class="dr-val gold">${fmt(pl.entry)}</span></div>
       `}
-      <div class="dp-row"><span class="dr-label">Take-profit (${pl.rr})</span><span class="dr-val buy">${pl.target!=null?fmt(pl.target):'—'}</span></div>
+      <div class="dp-row"><span class="dr-label">Take-profit${pl.target_ref?' — '+pl.target_ref:''}</span><span class="dr-val buy">${pl.target!=null?fmt(pl.target):'—'}</span></div>
       <div class="dp-row"><span class="dr-label">Move stop to breakeven at</span><span class="dr-val">${pl.be!=null?fmt(pl.be):'—'}</span></div>
-      <div class="dp-row"><span class="dr-label">Stop-loss</span><span class="dr-val sell">${pl.stop!=null?fmt(pl.stop):'—'}</span></div>
-      <div class="dp-row"><span class="dr-label">Stop size</span><span class="dr-val">${pl.atr_mult}× 4H-ATR ($${fmtN(pl.atr)})</span></div>
+      <div class="dp-row"><span class="dr-label">Stop-loss${pl.stop_ref?' — $2 '+(pl.dir==='SELL'?'above':'below')+' '+pl.stop_ref:''}</span><span class="dr-val sell">${pl.stop!=null?fmt(pl.stop):'—'}</span></div>
       ${rows?`<div class="dp-section-title" style="margin-top:12px;font-size:10px">${d.is_today?"TODAY'S":"THE DAY'S"} 4-HOUR CANDLES</div>${rows}`:''}
     </div>`;
   }
