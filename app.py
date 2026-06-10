@@ -447,11 +447,25 @@ def _trend_of(seq, n):
 def _daily_trend_asof(date_str, n=5):
     """The daily trend (UP/DOWN/FLAT) as known GOING INTO date_str — i.e. from the
        last n daily candles strictly before it. Used as the regime filter."""
+    return (_daily_trendnet_asof(date_str, n) or (None, 0))[0]
+
+def _daily_trendnet_asof(date_str, n=5):
+    """(dir, net) of the daily trend going into date_str (candles strictly before)."""
     days = [d for d in sorted(DATA['prices'])
             if d < date_str and DATA['prices'][d].get('open') is not None and DATA['prices'][d].get('close') is not None]
     seq = [(DATA['prices'][d]['close'], DATA['prices'][d]['open']) for d in days]
     tr = _trend_of(seq, n)
+    return (tr['dir'], tr['net']) if tr else (None, 0)
+
+def _tf_dir_asof(key, date_str, n):
+    """4H/1H trend dir from candles strictly BEFORE date_str (no intraday lookahead).
+       DATA[key] is kept chronologically sorted at load time, so no re-sort here."""
+    seq = [(c['close'], c['open']) for c in DATA.get(key, [])
+           if str(c.get('dt', ''))[:10] < date_str and c.get('close') is not None and c.get('open') is not None]
+    tr = _trend_of(seq, n)
     return tr['dir'] if tr else None
+
+HARD_DOWN_NET = -80.0   # 5-day daily net below this = a "hard" downtrend (Filter B veto)
 
 def _combined_move(date_str):
     """Take-profit move = average of (recent 30-day range) and (this day's moon
@@ -1322,13 +1336,27 @@ def build_day(date_str):
     # ── RULE 2: movable-sign 2-day PULLBACK (overrides sheet + engine direction) ──
     pb = _pullback_direction(date_str, today)
     if pb and day.get('signal') in ('BUY', 'STRONG BUY', 'SELL', 'STRONG SELL', 'WAIT', 'NO TRADE'):
-        day['signal'] = pb
-        day['signal_src'] = 'pullback'
-        day['pullback'] = True
-        b = abs(day.get('bias') or 20)
-        day['bias'] = b if pb == 'BUY' else -b
-        for k in ('expected_move', 'target', 'target_dir', 'target_anchor', 'target_is_est', 'expected_range', 'move_match_n'):
-            day.pop(k, None)                       # recompute projection for the flipped direction
+        base_sig = day.get('signal')               # sheet/engine signal before the pullback flip
+        # FILTER B SAFEGUARD: a pullback BUY is a counter-trend bounce bet. In a HARD
+        # downtrend (daily DOWN + strong negative net + 4H & 1H also down) that bet loses
+        # (Jun-10 type). Veto the flip and revert to the underlying sheet signal instead.
+        ddir, dnet = _daily_trendnet_asof(date_str)
+        hard_down = (ddir == 'DOWN' and dnet < HARD_DOWN_NET
+                     and _tf_dir_asof('h4', date_str, 6) == 'DOWN'
+                     and _tf_dir_asof('h1', date_str, 8) == 'DOWN')
+        if pb == 'BUY' and hard_down:
+            day['pullback_suppressed'] = True
+            day['suppress_reason'] = ('hard downtrend (5-day net %+.0f, 4H+1H down) — counter-trend '
+                                      'pullback BUY vetoed; reverted to %s' % (dnet, base_sig))
+            # keep day['signal'] = base_sig (the trend-aligned sheet signal); do NOT flip
+        else:
+            day['signal'] = pb
+            day['signal_src'] = 'pullback'
+            day['pullback'] = True
+            b = abs(day.get('bias') or 20)
+            day['bias'] = b if pb == 'BUY' else -b
+            for k in ('expected_move', 'target', 'target_dir', 'target_anchor', 'target_is_est', 'expected_range', 'move_match_n'):
+                day.pop(k, None)                   # recompute projection for the flipped direction
 
     # ── DECISION-DAY CONTINUATION (highest priority on the day after a Decision Day) ──
     # the decision day is a PAUSE; the trend (net of the 3 days before it) RESUMES today.
@@ -1487,6 +1515,20 @@ def build_day(date_str):
     else:
         day['mtf_with_trend'] = None
         day['mtf_label'] = None                     # no directional signal, or flat regime
+
+    # ── SAFEGUARD: wait for 4-hour confirmation ──
+    # if the daily signal direction is not matched by the 4-hour trend, warn the user to
+    # hold until the 4H confirms (don't blow the account on an un-confirmed entry).
+    h4d = _tf_dir_asof('h4', date_str, 6)
+    day['h4_dir'] = h4d
+    day['wait_4h'] = False
+    if sdir and h4d:
+        agree = (sdir == 'BUY' and h4d == 'UP') or (sdir == 'SELL' and h4d == 'DOWN')
+        if not agree:
+            day['wait_4h'] = True
+            day['wait_4h_msg'] = ("daily says %s but the 4-hour isn't %s yet — wait for the 4-hour "
+                                  "to confirm before entering (protect the account)"
+                                  % (sdir, 'up' if sdir == 'BUY' else 'down'))
 
     # one-line "why" explanation
     day['reason'] = _signal_reason(day)
@@ -1901,7 +1943,8 @@ def _alert_entry(day):
     return {'date': day['date'], 'dir': dirn, 'signal': day.get('signal'),
             'with_trend': day.get('mtf_with_trend'), 'label': day.get('mtf_label'),
             'regime': day.get('trend_regime'), 'entry': entry,
-            'stop': pl.get('stop'), 'target': pl.get('target'), 'outcome': pl.get('outcome')}
+            'stop': pl.get('stop'), 'target': pl.get('target'), 'outcome': pl.get('outcome'),
+            'wait_4h': day.get('wait_4h', False)}
 
 def _recent_alert_entries(n=20):
     """Last n trading-day alert entries (most-recent first) — derived from the engine,
@@ -2080,9 +2123,12 @@ def _setup_message(day):
     dirn = 'BUY' if 'BUY' in (day.get('signal') or '') else 'SELL'
     entry = ('$%.2f–$%.2f' % (pl['zone_low'], pl['zone_high'])) if pl.get('zone_low') is not None else (
             ('$%.2f' % pl['entry']) if pl.get('entry') is not None else '—')
-    return ('🎯 <b>TRADE SETUP</b> — %s\nWITH-TREND <b>%s</b> (daily trend is %s)\nEntry: %s\nStop: %s\nTarget: %s'
-            % (day['date'], dirn, str(day.get('trend_regime')).lower(), entry,
-               ('$%.2f' % pl['stop']) if pl.get('stop') is not None else '—',
+    head = ('⏳ <b>WAIT-4H CONFIRM</b> — %s\n%s <b>%s</b> but the 4-hour isn\'t %s yet — hold for the 4H to confirm\n'
+            % (day['date'], 'TRADE SETUP', dirn, 'up' if dirn == 'BUY' else 'down')) if day.get('wait_4h') else (
+           '🎯 <b>TRADE SETUP</b> — %s\nWITH-TREND <b>%s</b> (daily trend is %s)\n'
+            % (day['date'], dirn, str(day.get('trend_regime')).lower()))
+    return (head + 'Entry: %s\nStop: %s\nTarget: %s'
+            % (entry, ('$%.2f' % pl['stop']) if pl.get('stop') is not None else '—',
                ('$%.2f' % pl['target']) if pl.get('target') is not None else '—'))
 
 def check_setup_telegram(force=False):

@@ -1035,26 +1035,32 @@ function renderAction(t){
   const el=document.getElementById('action-card'); if(!el) return;
   if(!t){ el.style.display='none'; return; }
   let cls='text2', icon='ℹ️', txt='';
+  const dir = (!t.market_closed && t.signal)&&(/BUY/.test(t.signal)?'BUY':(/SELL/.test(t.signal)?'SELL':null));
   if(t.market_closed){ txt='Market closed — no trade today.'; }
+  else if(!dir){ txt='No trade signal today (WAIT / NO TRADE).'; }
   else {
-    const dir = t.signal&&(/BUY/.test(t.signal)?'BUY':(/SELL/.test(t.signal)?'SELL':null));
-    if(!dir){ txt='No trade signal today (WAIT / NO TRADE).'; }
-    else {
-      const pl=t.plan4h||{};
-      const entry = pl.zone_low!=null ? (fmt(pl.zone_low)+'–'+fmt(pl.zone_high)) : (pl.entry!=null?fmt(pl.entry):'—');
-      const sl = pl.stop!=null?fmt(pl.stop):'—', tp=pl.target!=null?fmt(pl.target):'—';
-      const reg=t.trend_regime, regw = reg==='DOWN'?'Downtrend':reg==='UP'?'Uptrend':'No clear trend';
-      if(t.mtf_with_trend===true){
-        cls=dir==='BUY'?'buy':'sell'; icon='✅';
-        txt=`<b>WITH-TREND ${dir} today</b> — take it. Entry ${entry} · stop ${sl} · target ${tp}.`;
-      } else if(t.mtf_with_trend===false){
-        cls='gold'; icon='⚠️';
-        const side = reg==='DOWN'?'sell':'buy';
-        txt=`<b>${regw} — ${side}-side only.</b> Today's signal is a counter-trend ${dir} → <b>skip / wait</b> (don't fight the trend).`;
-      } else {
-        cls='text2'; icon='ℹ️';
-        txt=`No clear daily trend — ${dir} signal. Trade with care. Entry ${entry} · stop ${sl} · target ${tp}.`;
-      }
+    const pl=t.plan4h||{};
+    const entry = pl.zone_low!=null ? (fmt(pl.zone_low)+'–'+fmt(pl.zone_high)) : (pl.entry!=null?fmt(pl.entry):'—');
+    const sl = pl.stop!=null?fmt(pl.stop):'—', tp=pl.target!=null?fmt(pl.target):'—';
+    const reg=t.trend_regime, regw = reg==='DOWN'?'Downtrend':reg==='UP'?'Uptrend':'No clear trend';
+    // live 4-hour trend (matches the trend card); fall back to the day's as-of value
+    const h4dir = (window.TRENDS && window.TRENDS.h4 && window.TRENDS.h4.dir) || t.h4_dir;
+    const wait4h = h4dir && !((dir==='BUY'&&h4dir==='UP')||(dir==='SELL'&&h4dir==='DOWN'));
+    if(wait4h){
+      // SAFEGUARD takes priority — don't enter an un-confirmed trade
+      cls='gold'; icon='⏳';
+      const need = dir==='BUY'?'up':'down';
+      txt=`<b>WAIT — daily says ${dir} but the 4-hour isn't ${need} yet.</b> Hold for the 4-hour candle to confirm before entering (protect the account).`;
+    } else if(t.mtf_with_trend===true){
+      cls=dir==='BUY'?'buy':'sell'; icon='✅';
+      txt=`<b>WITH-TREND ${dir} today</b> — 4H confirms, take it. Entry ${entry} · stop ${sl} · target ${tp}.`;
+    } else if(t.mtf_with_trend===false){
+      cls='gold'; icon='⚠️';
+      const side = reg==='DOWN'?'sell':'buy';
+      txt=`<b>${regw} — ${side}-side only.</b> Today's signal is a counter-trend ${dir} → <b>skip / wait</b> (don't fight the trend).`;
+    } else {
+      cls='text2'; icon='ℹ️';
+      txt=`No clear daily trend — ${dir} signal. Trade with care. Entry ${entry} · stop ${sl} · target ${tp}.`;
     }
   }
   const col = cls==='buy'?'var(--buy)':cls==='sell'?'var(--sell)':cls==='gold'?'var(--gold)':'var(--border2)';
@@ -1071,8 +1077,12 @@ function notifySetup(t){
     if(!('Notification' in window)) return;
     const dir=/BUY/.test(t.signal)?'BUY':'SELL', pl=t.plan4h||{};
     const entry = pl.zone_low!=null ? (fmt(pl.zone_low)+'–'+fmt(pl.zone_high)) : (pl.entry!=null?fmt(pl.entry):'—');
-    const body=`WITH-TREND ${dir} today. Entry ${entry} · stop ${pl.stop!=null?fmt(pl.stop):'—'} · target ${pl.target!=null?fmt(pl.target):'—'}.`;
-    const fire=()=>{ new Notification('🎯 Gold — Trade Setup', {body}); localStorage.setItem(key,'1'); };
+    const h4dir = (window.TRENDS && window.TRENDS.h4 && window.TRENDS.h4.dir) || t.h4_dir;
+    const wait4h = h4dir && !((dir==='BUY'&&h4dir==='UP')||(dir==='SELL'&&h4dir==='DOWN'));
+    const body = wait4h
+      ? `WAIT-4H confirm: daily ${dir} but the 4-hour isn't ${dir==='BUY'?'up':'down'} yet. Hold for the 4H before entering.`
+      : `WITH-TREND ${dir} today. Entry ${entry} · stop ${pl.stop!=null?fmt(pl.stop):'—'} · target ${pl.target!=null?fmt(pl.target):'—'}.`;
+    const fire=()=>{ new Notification(wait4h?'⏳ Gold — Wait for 4H':'🎯 Gold — Trade Setup', {body}); localStorage.setItem(key,'1'); };
     if(Notification.permission==='granted') fire();
     else if(Notification.permission!=='denied') Notification.requestPermission().then(p=>{ if(p==='granted') fire(); });
   }catch(e){}
@@ -1091,11 +1101,12 @@ async function renderAlerts(){
     const dc=r.dir==='BUY'?'buy':'sell', arr=r.dir==='BUY'?'▲':'▼';
     const wt = r.with_trend===true?'<span class="buy" style="font-size:8px;font-weight:700" title="with-trend">WT</span>'
              : r.with_trend===false?'<span class="gold" style="font-size:8px;font-weight:700" title="counter-trend">CT</span>':'';
+    const w4 = r.wait_4h?'<span class="gold" title="wait for 4-hour confirmation">⏳</span>':'';
     const dd=new Date(r.date+'T12:00').toLocaleDateString('en',{month:'short',day:'numeric'});
-    return `<div class="sb-alert-row" onclick="openDetail('${r.date}')" title="${r.date} · ${r.signal||''}">`
+    return `<div class="sb-alert-row" onclick="openDetail('${r.date}')" title="${r.date} · ${r.signal||''}${r.wait_4h?' · WAIT-4H confirm':''}">`
       + `<span class="text3" style="min-width:38px">${dd}</span>`
       + `<span class="${dc}" style="font-weight:700">${arr} ${r.dir}</span>`
-      + `<span>${wt}</span><span style="margin-left:auto">${oc(r.outcome)}</span></div>`;
+      + `<span>${wt}${w4}</span><span style="margin-left:auto">${oc(r.outcome)}</span></div>`;
   }).join('');
 }
 function confBar(conf, sig) {
@@ -1193,6 +1204,7 @@ function pcUseLive(){ if(window.LIVEPRICE){ document.getElementById('pc-input').
 async function loadTrends(){
   const grid=document.getElementById('trends-grid'); if(!grid) return;
   let t; try{ t=await fetch('/api/trends').then(r=>r.json()); }catch(e){ return; }
+  window.TRENDS = t;                       // live MTF trends — used by the wait-for-4H safeguard
   const cell=(label, tr, stale)=>{
     if(!tr) return `<div style="background:var(--card2);border:1px solid var(--border);border-radius:10px;padding:12px"><div class="text3 fs-11">${label}</div><div class="text3">no data</div></div>`;
     const up=tr.dir==='UP', down=tr.dir==='DOWN';
@@ -1209,6 +1221,7 @@ async function loadTrends(){
   const note=document.getElementById('trends-note');
   if(note) note.innerHTML = t.h1_stale ? ('1H data last '+t.h1_last+' (sheet H1 tab is behind)') : '';
   renderReversal(t);
+  if (typeof renderAction === 'function' && window.TODAY) renderAction(window.TODAY);  // refresh wait-4H with live 4H
 }
 
 // ── REVERSAL WATCH (down -> up): DOWNTREND / EARLY REVERSAL / CONFIRMED UPTREND ──
