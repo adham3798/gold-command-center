@@ -1985,6 +1985,54 @@ def _mirror_journal():
     except Exception as e:
         print('Journal mirror failed:', e)
 
+def _restore_journal_from_sheet():
+    """On boot, re-hydrate the journal from the Google Sheet JOURNAL tab (public CSV) so a
+       Render redeploy never loses accumulated history. Merge by date: a GRADED entry beats
+       a pending one; on equal completeness the LOCAL (current-run) entry wins — never
+       overwrite newer local data with older sheet data."""
+    try:
+        df = _read_tab('JOURNAL')
+    except Exception as e:
+        print('Journal restore skipped (no JOURNAL tab yet):', e); return
+    sheet = {}
+    cD = _find_col(df, 'Date'); cS = _find_col(df, 'Signal'); cSrc = _find_col(df, 'Source')
+    cL = _find_col(df, 'LoggedAt', 'Logged At'); cR = _find_col(df, 'Result'); cM = _find_col(df, 'Move')
+    if not cD or not cS:
+        return
+    for _, r in df.iterrows():
+        d = str(r.get(cD, '')).strip()[:10]
+        if not d or d.lower() == 'nan':
+            continue
+        sig = str(r.get(cS, '')).strip().upper()
+        if sig not in ('BUY', 'SELL', 'WAIT'):
+            continue
+        result = str(r.get(cR, '')).strip().lower() if cR else ''
+        outcome = None
+        if result in ('win', 'loss', 'wait'):
+            try:
+                mv = round(float(r.get(cM)), 2)
+            except (TypeError, ValueError):
+                mv = None
+            outcome = {'result': result, 'move': mv}
+        sheet[d] = {'signal': sig, 'source': (str(r.get(cSrc, '')).strip() or 'sheet') if cSrc else 'sheet',
+                    'logged_at_utc': str(r.get(cL, '')).strip() if cL else '', 'extra': {}, 'outcome': outcome}
+    if not sheet:
+        return
+    local = journal._load()
+    merged = dict(sheet)
+    for d, lr in local.items():
+        if d not in merged:
+            merged[d] = lr
+        else:
+            l_graded = lr.get('outcome') is not None
+            m_graded = merged[d].get('outcome') is not None
+            if m_graded and not l_graded:
+                pass                                  # keep sheet's graded result
+            else:
+                merged[d] = lr                        # local graded, or equal completeness -> local
+    journal._save(merged)
+    print('Journal restored from sheet: %d entries (local had %d)' % (len(merged), len(local)))
+
 def _record_today_journal():
     """Record TODAY's FINAL signal once, BEFORE the day closes (so it can't be back-filled).
        Records WAIT when the wait-for-4H safeguard is active."""
@@ -2255,6 +2303,7 @@ def init_app():
         check_decision_telegram()      # fire on startup too, if today's close already qualifies
         check_setup_telegram()         # ...and today's with-trend trade setup
         _log_alerts()                  # ...and persist today's alert-log row
+        _restore_journal_from_sheet()  # re-hydrate the journal from the sheet (survive redeploys)
         _record_today_journal()        # ...and log today's prediction (before close)
         journal.grade_pending(DATA['prices'])
     except Exception as e:
