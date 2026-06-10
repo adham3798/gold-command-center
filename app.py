@@ -96,6 +96,64 @@ def _load_candles(tab):
         })
     return out
 
+def _fetch_h1_yahoo(rng='1mo'):
+    """Recent 1-hour gold candles from Yahoo (GC=F futures). No API key needed.
+       Returns [{dt,open,high,low,close,direction}, ...] oldest->newest, or None."""
+    try:
+        r = req.get('https://query1.finance.yahoo.com/v8/finance/chart/GC=F',
+                    params={'interval': '1h', 'range': rng},
+                    headers={'User-Agent': 'Mozilla/5.0'}, timeout=15).json()
+        res = (r.get('chart', {}).get('result') or [None])[0]
+        if not res:
+            return None
+        ts = res.get('timestamp') or []
+        q = (res.get('indicators', {}).get('quote') or [{}])[0]
+        o, h, l, c = q.get('open', []), q.get('high', []), q.get('low', []), q.get('close', [])
+        out = []
+        for i, t in enumerate(ts):
+            try:
+                oo, hh, ll, cc = o[i], h[i], l[i], c[i]
+                if None in (oo, hh, ll, cc):
+                    continue
+                out.append({'dt': datetime.utcfromtimestamp(t).strftime('%Y-%m-%d %H:%M:%S'),
+                            'open': float(oo), 'high': float(hh), 'low': float(ll), 'close': float(cc),
+                            'direction': 'BULL' if cc >= oo else 'BEAR', 'trend': None})
+            except (IndexError, TypeError, ValueError):
+                continue
+        return out or None
+    except Exception as e:
+        print("Yahoo 1H fetch failed:", e)
+        return None
+
+def _fetch_h1_twelvedata():
+    """Higher-accuracy spot XAU/USD 1H from Twelve Data IF env TWELVEDATA_KEY is set."""
+    key = os.environ.get('TWELVEDATA_KEY')
+    if not key:
+        return None
+    try:
+        r = req.get('https://api.twelvedata.com/time_series',
+                    params={'symbol': 'XAU/USD', 'interval': '1h', 'outputsize': 500,
+                            'apikey': key, 'timezone': 'UTC'}, timeout=15).json()
+        out = []
+        for v in (r.get('values') or []):
+            try:
+                oo, cc = float(v['open']), float(v['close'])
+                out.append({'dt': v['datetime'], 'open': oo, 'high': float(v['high']),
+                            'low': float(v['low']), 'close': cc,
+                            'direction': 'BULL' if cc >= oo else 'BEAR', 'trend': None})
+            except (KeyError, ValueError, TypeError):
+                continue
+        out.sort(key=lambda x: x['dt'])
+        return out or None
+    except Exception as e:
+        print("Twelve Data 1H fetch failed:", e)
+        return None
+
+def fetch_live_h1():
+    """Fresh 1H gold candles to keep the dashboard current when the sheet's H1_DATA lags.
+       Prefers Twelve Data spot (if a key is set), else free Yahoo GC=F futures."""
+    return _fetch_h1_twelvedata() or _fetch_h1_yahoo()
+
 def load_data():
     """Pull everything live from the Google Sheet (spot). Raises on fetch failure."""
     # ── GOLD PRICES (spot OHLC) ──
@@ -175,6 +233,19 @@ def load_data():
         h4 = _load_candles('H4_DATA')
     except Exception as e:
         print("Candle load skipped:", e); h1, h4 = DATA.get('h1', []), DATA.get('h4', [])
+
+    # keep the 1-hour series CURRENT even if the sheet's H1_DATA tab lags: pull fresh
+    # 1H gold candles from a live source and append the ones newer than the sheet's latest
+    try:
+        live = fetch_live_h1()
+        if live:
+            latest = max((str(c.get('dt', '')) for c in h1), default='')
+            fresh = [c for c in live if str(c.get('dt', '')) > latest]
+            if fresh:
+                h1 = h1 + fresh
+                print("Live 1H: added %d fresh candles (newest %s)" % (len(fresh), fresh[-1]['dt']))
+    except Exception as e:
+        print("Live 1H merge skipped:", e)
 
     # ── WEEKLY_FORECAST: your sheet's own Expected Direction (source of truth) ──
     try:
