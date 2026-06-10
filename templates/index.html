@@ -991,6 +991,21 @@ function signalPill(s, large) {
   const strong = s && s.indexOf('STRONG')>=0 ? ' signal-strong' : '';
   return `<span class="signal ${cls}${large?' signal-lg':''}${strong}">${signalIcon(s)} ${s||'NO DATA'}</span>`;
 }
+// Multi-timeframe trend confidence label (informational only — never blocks a trade)
+function mtfLabel(d) {
+  if (!d || !d.mtf_label) return '';
+  const reg = d.trend_regime, regWord = reg==='UP'?'uptrend':reg==='DOWN'?'downtrend':'trend';
+  const isBuy = /BUY/.test(d.signal||''), isSell = /SELL/.test(d.signal||'');
+  let cls, txt;
+  if (d.mtf_with_trend) {
+    cls='buy'; txt=`✓ WITH-TREND — higher confidence (signal matches the daily ${regWord})`;
+  } else if (reg==='DOWN' && isBuy) {
+    cls='gold'; txt='⚠ COUNTER-TREND PULLBACK — BUY against the daily downtrend (historically ~breakeven · size down)';
+  } else {
+    cls='gold'; txt=`⚠ COUNTER-TREND PULLBACK — against the daily ${regWord} (lower confidence)`;
+  }
+  return `<div class="${cls} fs-12" style="font-weight:700;margin:0 0 10px;line-height:1.5;padding:6px 10px;border-radius:8px;background:${d.mtf_with_trend?'rgba(35,192,138,.10)':'rgba(245,164,32,.10)'}">${txt}</div>`;
+}
 function confBar(conf, sig) {
   const cls = sigColor(sig);
   return `<div class="conf-bar-wrap"><div class="conf-bar"><div class="conf-bar-fill ${cls}" style="width:${conf}%"></div></div><span class="conf-val">${conf}%</span></div>`;
@@ -1441,6 +1456,7 @@ function renderTodayDetail(t) {
   el.innerHTML = `
     <div class="dp-row"><span class="dr-label">Date</span><span class="dr-val">${new Date(t.date+'T12:00:00').toLocaleDateString('en-US',{weekday:'long',month:'long',day:'numeric'})}</span></div>
     <div class="dp-row"><span class="dr-label">Signal</span><span>${signalPill(t.signal)}</span></div>
+    ${mtfLabel(t)}
     ${t.reason?`<div class="text2 fs-12" style="margin:4px 0;line-height:1.5">💡 ${t.reason}</div>`:''}
     ${biasMeter(t.bias)}
     ${projLine(t)}
@@ -1740,6 +1756,7 @@ async function openDetail(dateStr) {
   html += `<div class="dp-section">
     <div class="dp-section-title">Signal ${d.signal_src==='sheet'?'<span class="gold" style="font-size:9px;font-weight:700">● FROM YOUR SHEET</span>':d.signal_src==='pullback'?'<span class="sell" style="font-size:9px;font-weight:700">● PULLBACK (movable 2-day reverse)</span>':d.signal_src==='decision'?'<span class="gold" style="font-size:9px;font-weight:700">⚠️ DECISION-DAY CONTINUATION</span>':''} ${d.power_date?'<span class="gold" style="font-size:9px;font-weight:700">★ POWER DATE 3·7·9</span>':''}</div>
     <div style="margin-bottom:8px">${signalPill(sig, true)}</div>
+    ${mtfLabel(d)}
     ${d.reason?`<div class="text2 fs-12" style="margin:0 0 10px;line-height:1.5">💡 ${d.reason}</div>`:''}
     ${d.after_decision?`<div class="gold fs-12" style="font-weight:700;margin:0 0 10px;line-height:1.5">⚠️ Decision-Day continuation: ${d.prev_decision_date} was a Decision Day (a pause). The trend before it (last 3 days net ${d.trend_net>=0?'+$'+fmtN(d.trend_net):'−$'+fmtN(Math.abs(d.trend_net))}) resumes → today is <b>${d.decision_dir}</b>. Enter on the bounce ${d.decision_dir==='SELL'?'above':'below'} the decision day's ${d.decision_dir==='SELL'?'high '+fmt(d.decision_high):'low '+fmt(d.decision_low)}.</div>`:''}
     ${(d.buy_score!=null||d.sell_score!=null)?`<div class="dp-row"><span class="dr-label">Buy / Sell score</span><span class="dr-val"><span class="buy">${d.buy_score??'—'}</span> / <span class="sell">${d.sell_score??'—'}</span></span></div>`:''}

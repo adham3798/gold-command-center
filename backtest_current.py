@@ -49,7 +49,8 @@ def collect():
         r = (reward / risk) if oc == 'W' else (-1.0 if oc == 'L' else 0.0)
         trades.append({'date': ds, 'src': day.get('signal_src') or 'normal',
                        'kind': 'decision' if p.get('decision') else 'normal',
-                       'dir': d, 'oc': oc, 'r': r, 'risk': risk, 'reward': reward})
+                       'dir': d, 'oc': oc, 'r': r, 'risk': risk, 'reward': reward,
+                       'regime': day.get('trend_regime'), 'mtf': day.get('mtf_label')})
     return trades, counts
 
 def stats(trades, label):
@@ -96,3 +97,17 @@ if __name__ == '__main__':
     print('---- by direction ----\n')
     stats([t for t in trades if t['dir'] == 'BUY'], 'BUY trades')
     stats([t for t in trades if t['dir'] == 'SELL'], 'SELL trades')
+    print('==== MULTI-TIMEFRAME TREND FILTER (daily-trend regime) ====\n')
+    wt = [t for t in trades if t['mtf'] == 'WITH-TREND']
+    ct = [t for t in trades if t['mtf'] == 'COUNTER-TREND PULLBACK']
+    nt = [t for t in trades if t['mtf'] not in ('WITH-TREND', 'COUNTER-TREND PULLBACK')]
+    stats(wt, 'WITH-TREND only (the proposed filter)')
+    stats(ct, 'COUNTER-TREND PULLBACK only (what we would ignore)')
+    stats(wt + nt, 'KEEP with-trend + flat-regime (drop counter-trend)')
+    stats(nt, 'FLAT regime (no filter applies)')
+    print('---- regime x direction ----\n')
+    rd = lambda rg, dr: [t for t in trades if t['regime'] == rg and t['dir'] == dr]
+    stats(rd('DOWN', 'BUY'),  'BUY in DOWNtrend  (counter-trend buy = your concern)')
+    stats(rd('DOWN', 'SELL'), 'SELL in DOWNtrend (with-trend)')
+    stats(rd('UP', 'BUY'),    'BUY in UPtrend    (with-trend)')
+    stats(rd('UP', 'SELL'),   'SELL in UPtrend   (counter-trend sell)')

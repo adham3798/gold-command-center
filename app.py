@@ -424,6 +424,15 @@ def _trend_of(seq, n):
     else:                      d = 'DOWN'
     return {'dir': d, 'net': round(net, 2), 'bull': bull, 'bars': len(seq), 'last': round(closes[-1], 2)}
 
+def _daily_trend_asof(date_str, n=5):
+    """The daily trend (UP/DOWN/FLAT) as known GOING INTO date_str — i.e. from the
+       last n daily candles strictly before it. Used as the regime filter."""
+    days = [d for d in sorted(DATA['prices'])
+            if d < date_str and DATA['prices'][d].get('open') is not None and DATA['prices'][d].get('close') is not None]
+    seq = [(DATA['prices'][d]['close'], DATA['prices'][d]['open']) for d in days]
+    tr = _trend_of(seq, n)
+    return tr['dir'] if tr else None
+
 def _combined_move(date_str):
     """Take-profit move = average of (recent 30-day range) and (this day's moon
        sign+stage average range). Blends current volatility with the astro setup."""
@@ -1446,6 +1455,18 @@ def build_day(date_str):
                 day['sl'] = plan.get('stop'); day['be'] = plan.get('be')
                 if plan.get('outcome') in ('W', 'L', 'NF'):
                     day['outcome'] = plan['outcome']; day['correct'] = (plan['outcome'] == 'W')
+
+    # ── MULTI-TIMEFRAME TREND FILTER: label the signal with-trend vs counter-trend ──
+    regime = _daily_trend_asof(date_str)            # daily trend going into this day
+    day['trend_regime'] = regime
+    sdir = 'BUY' if 'BUY' in (day.get('signal') or '') else ('SELL' if 'SELL' in (day.get('signal') or '') else None)
+    if sdir and regime in ('UP', 'DOWN'):
+        wt = (sdir == 'BUY' and regime == 'UP') or (sdir == 'SELL' and regime == 'DOWN')
+        day['mtf_with_trend'] = wt
+        day['mtf_label'] = 'WITH-TREND' if wt else 'COUNTER-TREND PULLBACK'
+    else:
+        day['mtf_with_trend'] = None
+        day['mtf_label'] = None                     # no directional signal, or flat regime
 
     # one-line "why" explanation
     day['reason'] = _signal_reason(day)
