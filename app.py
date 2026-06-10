@@ -318,12 +318,32 @@ def _compute_moves():
         if v.get('high') and v.get('low'):
             ranges.append(v['high'] - v['low'])
     last = DATA['prices'][max(DATA['prices'])]['close'] if DATA['prices'] else 0
+    # recent average RANGE (last 30 trading days) — current volatility, not the old low-price era
+    recent_days = sorted(DATA['prices'])[-30:]
+    recent_rng = [DATA['prices'][d]['high'] - DATA['prices'][d]['low']
+                  for d in recent_days if DATA['prices'][d].get('high') and DATA['prices'][d].get('low')]
     DATA['moves'] = {
         'avg_up':    round(st.mean(ups), 2)    if ups    else 0,
         'avg_down':  round(st.mean(downs), 2)  if downs  else 0,
         'avg_range': round(st.mean(ranges), 2) if ranges else 0,
+        'recent_range': round(st.mean(recent_rng), 2) if recent_rng else 0,
         'last_close': last,
     }
+
+def _signstage_range(date_str):
+    """Average daily RANGE for days matching this date's moon sign+stage (or None)."""
+    m = DATA['moon'].get(date_str)
+    if not m:
+        return None
+    return _matching_moves(date_str, m['sign'], m['stage']).get('avg_range')
+
+def _combined_move(date_str):
+    """Take-profit move = average of (recent 30-day range) and (this day's moon
+       sign+stage average range). Blends current volatility with the astro setup."""
+    recent = DATA.get('moves', {}).get('recent_range') or 0
+    ss = _signstage_range(date_str)
+    vals = [v for v in (recent, ss) if v]
+    return round(sum(vals) / len(vals), 2) if vals else None
 
 def load_data_safe():
     """Load from sheet; on failure keep existing data, or fall back to Excel on cold start."""
@@ -764,29 +784,30 @@ def _first_trading_day_after(d, today):
     return None
 
 def decision_continuation(date_str, today):
-    """If the immediately-preceding trading day was a Decision Day, return the
-       continuation call for THIS day: direction (continue the close's lean) and the
-       entry = that decision day's midpoint. Else None.
-         close at/below midpoint -> weak close  -> SELL next day
-         close above   midpoint -> strong close -> BUY  next day
-       Only fires on the decision day's immediate next trading day."""
+    """A Decision Day is a PAUSE inside the main trend, so the next day RESUMES that
+       trend (it does not flip). Direction = net of the last 3 trading days BEFORE the
+       decision day (down -> SELL, up -> BUY). Entry/stop are built off the decision
+       day's HIGH/LOW. Only fires on the decision day's immediate next trading day."""
     prev = _prev_completed_day(date_str)
     if not prev or not _is_decision_day(prev):
         return None
-    # guard: only the immediate next trading day after the decision day
     if date_str > today and date_str != _first_trading_day_after(prev, today):
         return None
     pv = DATA['prices'][prev]
-    hi, lo, cl = pv.get('high'), pv.get('low'), pv.get('close')
-    if None in (hi, lo, cl):
+    hi, lo = pv.get('high'), pv.get('low')
+    if hi is None or lo is None:
         return None
-    rng = (hi - lo) or 1
-    mid = (hi + lo) / 2
+    # main trend = net change of the last 3 trading days BEFORE the decision day
+    before = [d for d in sorted(DATA['prices'])
+              if d < prev and DATA['prices'][d].get('change') is not None][-3:]
+    net = sum(DATA['prices'][d]['change'] for d in before)
+    if not before or net == 0:
+        return None
     return {
         'prev': prev, 'prev_change': round(pv['change'], 2),
-        'dir': 'SELL' if cl <= mid else 'BUY',
-        'entry': round(mid, 2), 'mid': round(mid, 2),
-        'close_pos': round((cl - lo) / rng * 100),   # % of range the close sat at
+        'dir': 'SELL' if net < 0 else 'BUY',
+        'decision_high': round(hi, 2), 'decision_low': round(lo, 2),
+        'trend_net': round(net, 2), 'trend_days': before,
     }
 
 # ── 4-HOUR TRADING PLAN ─────────────────────────────────────────────────────────
@@ -1014,115 +1035,81 @@ def _h1_window(date_str):
     return out, days
 
 def build_decision_plan(date_str, dc, today):
-    """Decision-day plan with TWO entries — LEVELS FIRST (Option A, refined).
-       Entry 1 = decision-day midpoint, Entry 2 = pivot point.
-       Fill rule: take whichever PRICE LEVEL (pivot/midpoint) price reaches first.
-       ONLY if neither level is reached all day, fall back to the candle trigger
-       (first green candle for SELL / red candle for BUY).
-       Uses 1-hour candles; if the sheet has none for the day (e.g. today), falls back
-       to that day's 4-hour candles. Stop/TP from 4H ATR, breakeven trail on the candles."""
+    """Decision-day continuation plan (trend resumes after the pause):
+       - direction = dc['dir'] (net of the 3 days before the decision day)
+       - ENTRY = a ZONE $8-10 beyond the decision day's extreme (sell above its HIGH /
+         buy below its LOW) — you fade the bounce back into the trend
+       - STOP  = $20 beyond the decision day's HIGH/LOW
+       - TARGET= entry ∓ combined move  (avg of recent-30d range & sign+stage range)
+       Fills when price trades into the zone; then W=target / L=stop."""
     direction = dc['dir']; sell = direction == 'SELL'
-    entry1 = dc['mid']                       # midpoint
-    entry2 = _pp_for(date_str)               # pivot
-    atr = _h4_atr(date_str)
+    dhigh = dc.get('decision_high'); dlow = dc.get('decision_low')
+    if dhigh is None or dlow is None:
+        return None
+    move = _combined_move(date_str)
+    if not move:
+        return None
+    if sell:
+        zlo = round(dhigh + 8, 2); zhi = round(dhigh + 10, 2)     # sell zone (above the high)
+        entry = zlo                                               # near edge = entry reference
+        stop  = round(dhigh + 20, 2)
+        tgt   = round(entry - move, 2)
+    else:
+        zhi = round(dlow - 8, 2); zlo = round(dlow - 10, 2)       # buy zone (below the low)
+        entry = zhi
+        stop  = round(dlow - 20, 2)
+        tgt   = round(entry + move, 2)
+
     win_h1, win_days = _h1_window(date_str)
     if not win_h1:                            # no 1-hour data -> use 4-hour intraday
         win_h1, win_days = _h4_window_candles(date_str)
-    if atr is None or not win_h1:
-        return None
-    levels = [('midpoint', round(entry1, 2))]
-    if entry2:
-        levels.append(('pivot', round(entry2, 2)))
-
-    # ── Phase 1a: LEVELS FIRST — first candle that reaches either entry level ──
-    fill_i = entry = fill_time = fill_type = fill_level = None
-    for i, r in enumerate(win_h1):
-        if sell:
-            touched = [(nm, lv) for nm, lv in levels if r['h'] >= lv]
-            if touched:
-                fill_level, entry = max(touched, key=lambda x: x[1])   # best (highest) sell level
-        else:
-            touched = [(nm, lv) for nm, lv in levels if r['l'] <= lv]
-            if touched:
-                fill_level, entry = min(touched, key=lambda x: x[1])   # best (lowest) buy level
-        if entry is not None:
-            fill_i = i; fill_time = r['time']; fill_type = 'level'; break
-
-    # ── Phase 1b: BACKUP — only if NO level was reached, use the candle trigger ──
-    if entry is None:
-        for i, r in enumerate(win_h1):
-            if (sell and r['c'] >= r['o']) or ((not sell) and r['c'] <= r['o']):
-                entry = r['c']; fill_i = i; fill_time = r['time']
-                fill_type = '1H-green' if sell else '1H-red'
-                break
-
     is_past = date_str < today
     day_candles = [{**_pub_candle(r), 'tags': []} for r in _H4_BY_DAY.get(date_str, [])]
-    trig = 'green 1-hour candle' if sell else 'red 1-hour candle'
 
-    if entry is None:
-        adv = ('NO TRADE — neither entry level was reached and no %s appeared.' % trig) if is_past else None
-        return {'dir': direction, 'decision': True, 'entry1': round(entry1, 2),
-                'entry2': round(entry2, 2) if entry2 else None, 'entry': None, 'filled': False,
-                'fill_type': None, 'fill_level': None, 'fill_time': None,
-                'stop': None, 'target': None, 'be': None, 'stop_ref': None, 'target_ref': None,
-                'outcome': 'NF' if is_past else None, 'candles': day_candles,
-                'n_candles': len(day_candles), 'trigger': trig, 'advice': adv}
-
-    # stop/target from the pivot ladder (rule ii): stop $2 below the next level under
-    # the entry, target = next R (buy) / next S (sell)
-    stop0, tgt, be, stop_ref, target_ref = _plan_sltp(date_str, direction, entry, atr)
-    if stop0 is None or tgt is None or be is None:
-        return None
-
-    # ── Phase 2: breakeven-trail management on the 1H candles after the fill ──
-    armed = False; outcome = None
-    for r in win_h1[fill_i + 1:]:
+    # walk candles: fill when price trades INTO the zone, then target / stop
+    filled = False; fill_time = None; outcome = None
+    for r in (win_h1 or []):
         h, l = r['h'], r['l']
+        if not filled:
+            if (sell and h >= zlo) or ((not sell) and l <= zhi):
+                filled = True; fill_time = r['time']
+            else:
+                continue
         if sell:
-            if not armed:
-                if h >= stop0: outcome = 'L'; break
-                if l <= tgt:   outcome = 'W'; break
-                if l <= be:    armed = True
-            else:
-                if h >= entry: outcome = 'BE'; break
-                if l <= tgt:   outcome = 'W'; break
+            if h >= stop: outcome = 'L'; break
+            if l <= tgt:  outcome = 'W'; break
         else:
-            if not armed:
-                if l <= stop0: outcome = 'L'; break
-                if h >= tgt:   outcome = 'W'; break
-                if h >= be:    armed = True
-            else:
-                if l <= entry: outcome = 'BE'; break
-                if h >= tgt:   outcome = 'W'; break
-    if outcome is None and is_past and win_days and win_days[-1] < today:
-        outcome = 'BE' if armed else 'L'
+            if l <= stop: outcome = 'L'; break
+            if h >= tgt:  outcome = 'W'; break
+    if not filled and is_past and win_days and win_days[-1] < today:
+        outcome = 'NF'
 
-    entry_label = (fill_level if fill_type == 'level' else
-                   ('1H green candle' if fill_type == '1H-green' else '1H red candle'))
-    adv = _decision_advice(direction, entry1, entry2, entry, fill_type, fill_level,
-                           fill_time, stop0, tgt, outcome, is_past, date_str == today, trig)
+    adv = _decision_advice(direction, entry, zlo, zhi, stop, tgt, move, dc,
+                           filled, fill_time, outcome, is_past, date_str == today)
     return {'dir': direction, 'decision': True,
-            'entry1': round(entry1, 2), 'entry2': round(entry2, 2) if entry2 else None,
-            'entry': round(entry, 2), 'entry_label': entry_label, 'filled': True,
-            'fill_type': fill_type, 'fill_level': fill_level, 'fill_time': fill_time,
-            'stop': round(stop0, 2), 'target': round(tgt, 2), 'be': round(be, 2),
-            'stop_dist': round(abs(entry-stop0), 2), 'tp_dist': round(abs(tgt-entry), 2),
-            'stop_ref': stop_ref, 'target_ref': target_ref, 'outcome': outcome,
+            'zone_low': zlo, 'zone_high': zhi, 'entry': entry, 'entry_label': 'decision zone',
+            'stop': stop, 'stop_ref': ('high +$20' if sell else 'low −$20'),
+            'target': tgt, 'target_ref': 'avg move $%.0f' % move, 'be': None,
+            'move': move, 'move_recent': DATA.get('moves', {}).get('recent_range'),
+            'move_signstage': _signstage_range(date_str),
+            'trend_net': dc.get('trend_net'), 'prev_decision_date': dc.get('prev'),
+            'filled': filled, 'fill_time': fill_time, 'outcome': outcome,
             'candles': day_candles, 'n_candles': len(day_candles),
-            'trigger': trig, 'advice': adv}
+            'trigger': 'price trades into the zone', 'advice': adv}
 
-def _decision_advice(direction, e1, e2, entry, ftype, flevel, ftime, stop, tgt, outcome, is_past, is_today, trig):
-    lvls = ('midpoint $%.2f or pivot $%.2f' % (e1, e2)) if e2 else ('midpoint $%.2f' % e1)
-    how = {'level': 'at the %s' % (flevel or 'level'),
-           '1H-green': 'on a green 1H candle', '1H-red': 'on a red 1H candle'}.get(ftype, '')
-    base = '%s entered %s $%.2f (%s). Stop $%.2f, target $%.2f.' % (direction, how, entry, ftime or '', stop, tgt)
-    if outcome == 'W':  return 'WIN — ' + base + ' Target hit (+1R).'
-    if outcome == 'BE': return 'BREAKEVEN — ' + base + ' Trailed to entry (0).'
-    if outcome == 'L':  return 'LOSS — ' + base + ' Stopped (−1R).'
-    if is_today:        return 'LIVE — ' + base
-    return ('PLAN — %s on a %s; entries at %s (whichever comes first). Stop %.2f, target %.2f.'
-            % (direction, trig, lvls, stop, tgt))
+def _decision_advice(direction, entry, zlo, zhi, stop, tgt, move, dc, filled, fill_time, outcome, is_past, is_today):
+    zone = '$%.2f–$%.2f' % (zlo, zhi)
+    base = ('%s zone %s · stop $%.2f · target $%.2f (move $%.0f)'
+            % (direction, zone, stop, tgt, move))
+    trend = 'downtrend' if dc.get('dir') == 'SELL' else 'uptrend'
+    if outcome == 'W':  return 'WIN — %s. Trade hit target $%.2f.' % (base, tgt)
+    if outcome == 'L':  return 'LOSS — %s. Stopped at $%.2f.' % (base, stop)
+    if outcome == 'NF': return 'NO TRADE — price never reached the %s entry zone %s.' % (direction, zone)
+    if is_today:
+        return ('%s — %s. The decision day was a pause in the %s; %s the bounce into %s.'
+                % ('LIVE (filled)' if filled else 'WAITING', base, trend, 'sell' if direction=='SELL' else 'buy', zone))
+    return ('PLAN — decision day was a pause in the %s, so trend resumes: %s. Enter when price trades into %s.'
+            % (trend, base, zone))
 
 def build_day(date_str):
     today = datetime.today().strftime('%Y-%m-%d')
@@ -1228,17 +1215,16 @@ def build_day(date_str):
             day.pop(k, None)                       # recompute projection for the flipped direction
 
     # ── DECISION-DAY CONTINUATION (highest priority on the day after a Decision Day) ──
-    # decision day closed at/below its midpoint -> SELL ; above its midpoint -> BUY.
-    # the decision day's midpoint becomes this day's entry.
+    # the decision day is a PAUSE; the trend (net of the 3 days before it) RESUMES today.
     dc = decision_continuation(date_str, today) if not day.get('market_closed') else None
     if dc:
         day['after_decision'] = True
         day['prev_decision_date'] = dc['prev']
         day['prev_decision_change'] = dc['prev_change']
         day['decision_dir'] = dc['dir']
-        day['decision_entry'] = dc['entry']
-        day['decision_mid'] = dc['mid']
-        day['decision_close_pos'] = dc['close_pos']
+        day['decision_high'] = dc['decision_high']
+        day['decision_low'] = dc['decision_low']
+        day['trend_net'] = dc['trend_net']
         day['signal'] = dc['dir']
         day['signal_src'] = 'decision'
         b = abs(day.get('bias') or 30)
@@ -1282,10 +1268,9 @@ def build_day(date_str):
     # (a correct call can pay off within ~3 days, e.g. June-2 SELL -> June-3 drop).
     sg = day.get('signal')
     if (p and day.get('is_past') and sg in ('BUY', 'STRONG BUY', 'SELL', 'STRONG SELL')
-            and day.get('expected_move')):
+            and day.get('expected_move') and day.get('signal_src') != 'decision'):  # decision days handled by plan4h
         mv = day['expected_move']; ddir = 'BUY' if 'BUY' in sg else 'SELL'
-        # decision-day continuation enters at the decision day's midpoint, else the Pivot Point
-        entry = day.get('decision_entry') or _pp_for(date_str) or p.get('open')
+        entry = _pp_for(date_str) or p.get('open')
         if entry:
             if ddir == 'BUY':
                 day['tp'] = round(entry + mv, 2); day['sl'] = round(entry - mv, 2); day['be'] = round(entry + 0.5*mv, 2)
@@ -1363,15 +1348,17 @@ def build_day(date_str):
     if pdir and not day.get('market_closed'):
         plan = None
         if day.get('signal_src') == 'decision' and dc:
-            plan = build_decision_plan(date_str, dc, today)   # 2 entries + 1H trigger (Option A)
+            plan = build_decision_plan(date_str, dc, today)   # trend-continuation zone plan
         if plan is None:
-            if day.get('signal_src') == 'decision' and day.get('decision_entry') is not None:
-                plan = build_4h_plan(date_str, pdir, today,
-                                     entry=day['decision_entry'], entry_label='decision-day midpoint')
-            else:
-                plan = build_4h_plan(date_str, pdir, today)
+            plan = build_4h_plan(date_str, pdir, today)       # normal pivot plan
         if plan:
             day['plan4h'] = plan
+            # for decision days, mirror the plan's entry/stop/target into the Signal section
+            if day.get('signal_src') == 'decision':
+                day['entry'] = plan.get('entry'); day['tp'] = plan.get('target')
+                day['sl'] = plan.get('stop'); day['be'] = plan.get('be')
+                if plan.get('outcome') in ('W', 'L', 'NF'):
+                    day['outcome'] = plan['outcome']; day['correct'] = (plan['outcome'] == 'W')
 
     # one-line "why" explanation
     day['reason'] = _signal_reason(day)
@@ -1822,13 +1809,13 @@ def _decision_telegram_message(dd, nday):
          % ('+' if ch >= 0 else '-', abs(ch), DECISION_MAX)]
     if nday and nday.get('decision_dir'):
         p = nday.get('plan4h') or {}
-        L += ['', 'Next day <b>%s</b> → <b>%s</b>' % (nday['date'], nday['decision_dir'])]
-        if nday.get('decision_entry') is not None:
-            L.append('Entry 1 (midpoint): $%.2f' % nday['decision_entry'])
-        if p.get('entry2') is not None:
-            L.append('Entry 2 (pivot): $%.2f' % p['entry2'])
-        trig = 'green 1H candle' if nday['decision_dir'] == 'SELL' else 'red 1H candle'
-        L.append('Trigger: %s (whichever comes first)' % trig)
+        L += ['', 'Next day <b>%s</b> → <b>%s</b> (trend resumes after the pause)' % (nday['date'], nday['decision_dir'])]
+        if p.get('zone_low') is not None and p.get('zone_high') is not None:
+            L.append('Entry zone: $%.2f–$%.2f' % (p['zone_low'], p['zone_high']))
+        if p.get('stop') is not None:
+            L.append('Stop: $%.2f' % p['stop'])
+        if p.get('target') is not None:
+            L.append('Target: $%.2f' % p['target'])
     return '\n'.join(L)
 
 def check_decision_telegram(force=False):

@@ -1713,7 +1713,7 @@ async function openDetail(dateStr) {
     <div class="dp-section-title">Signal ${d.signal_src==='sheet'?'<span class="gold" style="font-size:9px;font-weight:700">● FROM YOUR SHEET</span>':d.signal_src==='pullback'?'<span class="sell" style="font-size:9px;font-weight:700">● PULLBACK (movable 2-day reverse)</span>':d.signal_src==='decision'?'<span class="gold" style="font-size:9px;font-weight:700">⚠️ DECISION-DAY CONTINUATION</span>':''} ${d.power_date?'<span class="gold" style="font-size:9px;font-weight:700">★ POWER DATE 3·7·9</span>':''}</div>
     <div style="margin-bottom:8px">${signalPill(sig, true)}</div>
     ${d.reason?`<div class="text2 fs-12" style="margin:0 0 10px;line-height:1.5">💡 ${d.reason}</div>`:''}
-    ${d.after_decision?`<div class="gold fs-12" style="font-weight:700;margin:0 0 10px;line-height:1.5">⚠️ Decision-Day continuation: ${d.prev_decision_date} was a Decision Day and closed at ${d.decision_close_pos}% of its range (${d.decision_close_pos<=50?'near/below':'above'} the midpoint ${fmt(d.decision_mid)}) → today is <b>${d.decision_dir}</b>, entering at that midpoint ${fmt(d.decision_entry)}.</div>`:''}
+    ${d.after_decision?`<div class="gold fs-12" style="font-weight:700;margin:0 0 10px;line-height:1.5">⚠️ Decision-Day continuation: ${d.prev_decision_date} was a Decision Day (a pause). The trend before it (last 3 days net ${d.trend_net>=0?'+$'+fmtN(d.trend_net):'−$'+fmtN(Math.abs(d.trend_net))}) resumes → today is <b>${d.decision_dir}</b>. Enter on the bounce ${d.decision_dir==='SELL'?'above':'below'} the decision day's ${d.decision_dir==='SELL'?'high '+fmt(d.decision_high):'low '+fmt(d.decision_low)}.</div>`:''}
     ${(d.buy_score!=null||d.sell_score!=null)?`<div class="dp-row"><span class="dr-label">Buy / Sell score</span><span class="dr-val"><span class="buy">${d.buy_score??'—'}</span> / <span class="sell">${d.sell_score??'—'}</span></span></div>`:''}
     ${d.transition?`<div class="dp-row"><span class="dr-label">Transition</span><span class="dr-val">${d.transition}</span></div>`:''}
     ${biasMeter(d.bias)}
@@ -1744,17 +1744,19 @@ async function openDetail(dateStr) {
       <div class="dp-section-title">⏱ 4-Hour Trading Plan ${ocBadge}</div>
       <div class="${pl.dir==='BUY'?'buy':'sell'} fs-12" style="font-weight:700;line-height:1.5;margin:0 0 10px">${pl.advice||''}</div>
       ${pl.decision ? `
-        <div class="dp-row"><span class="dr-label">Action</span><span class="dr-val ${pl.dir==='BUY'?'buy':'sell'}">${pl.dir==='BUY'?'▲ BUY':'▼ SELL'} — trigger: ${pl.trigger}</span></div>
-        <div class="dp-row"><span class="dr-label">Entry 1 — midpoint</span><span class="dr-val">${fmt(pl.entry1)}</span></div>
-        <div class="dp-row"><span class="dr-label">Entry 2 — pivot</span><span class="dr-val">${pl.entry2!=null?fmt(pl.entry2):'—'}</span></div>
-        <div class="dp-row"><span class="dr-label">Filled</span><span class="dr-val gold">${pl.filled?`${fmt(pl.entry)} · ${pl.entry_label}${pl.fill_time?' ('+pl.fill_time+')':''}`:'not triggered'}</span></div>
+        <div class="dp-row"><span class="dr-label">Action</span><span class="dr-val ${pl.dir==='BUY'?'buy':'sell'}">${pl.dir==='BUY'?'▲ BUY':'▼ SELL'} — trend continuation</span></div>
+        <div class="dp-row"><span class="dr-label">Entry zone (${pl.dir==='SELL'?'high +$8–10':'low −$8–10'})</span><span class="dr-val gold">${pl.zone_low!=null?fmt(pl.zone_low)+' – '+fmt(pl.zone_high):'—'}</span></div>
+        <div class="dp-row"><span class="dr-label">Filled</span><span class="dr-val">${pl.filled?('✓ entered'+(pl.fill_time?' ('+pl.fill_time+')':'')):'not triggered yet'}</span></div>
+        <div class="dp-row"><span class="dr-label">Take-profit (${pl.target_ref})</span><span class="dr-val buy">${pl.target!=null?fmt(pl.target):'—'}</span></div>
+        <div class="dp-row"><span class="dr-label">Stop-loss (${pl.stop_ref})</span><span class="dr-val sell">${pl.stop!=null?fmt(pl.stop):'—'}</span></div>
+        <div class="dp-row"><span class="dr-label">Move size</span><span class="dr-val">$${fmtN(pl.move)} <span class="text3 fs-11">(recent range $${fmtN(pl.move_recent)} + ${pl.dir==='BUY'?'sign':'sign'}+stage $${fmtN(pl.move_signstage)})/2</span></span></div>
       ` : `
         <div class="dp-row"><span class="dr-label">Action</span><span class="dr-val ${pl.dir==='BUY'?'buy':'sell'}">${pl.dir==='BUY'?'▲ BUY':'▼ SELL'} at the pivot</span></div>
         <div class="dp-row"><span class="dr-label">Entry — ${pl.entry_label||'pivot point'}</span><span class="dr-val gold">${fmt(pl.entry)}</span></div>
+        <div class="dp-row"><span class="dr-label">Take-profit${pl.target_ref?' — '+pl.target_ref:''}</span><span class="dr-val buy">${pl.target!=null?fmt(pl.target):'—'}</span></div>
+        <div class="dp-row"><span class="dr-label">Move stop to breakeven at</span><span class="dr-val">${pl.be!=null?fmt(pl.be):'—'}</span></div>
+        <div class="dp-row"><span class="dr-label">Stop-loss${pl.stop_ref?' — $2 '+(pl.dir==='SELL'?'above':'below')+' '+pl.stop_ref:''}</span><span class="dr-val sell">${pl.stop!=null?fmt(pl.stop):'—'}</span></div>
       `}
-      <div class="dp-row"><span class="dr-label">Take-profit${pl.target_ref?' — '+pl.target_ref:''}</span><span class="dr-val buy">${pl.target!=null?fmt(pl.target):'—'}</span></div>
-      <div class="dp-row"><span class="dr-label">Move stop to breakeven at</span><span class="dr-val">${pl.be!=null?fmt(pl.be):'—'}</span></div>
-      <div class="dp-row"><span class="dr-label">Stop-loss${pl.stop_ref?' — $2 '+(pl.dir==='SELL'?'above':'below')+' '+pl.stop_ref:''}</span><span class="dr-val sell">${pl.stop!=null?fmt(pl.stop):'—'}</span></div>
       ${rows?`<div class="dp-section-title" style="margin-top:12px;font-size:10px">${d.is_today?"TODAY'S":"THE DAY'S"} 4-HOUR CANDLES</div>${rows}`:''}
     </div>`;
   }
