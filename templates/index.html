@@ -557,6 +557,9 @@ input,select,textarea{font-family:inherit}
 
     <!-- ═══════ PAGE: DASHBOARD ═══════ -->
     <div class="page active" id="page-dashboard">
+      <!-- Today's Action — plain-language what-to-do, top of dashboard -->
+      <div class="card mb-20" id="action-card" style="display:none"></div>
+
       <!-- Decision Day alert (small ±10 close -> next day important) -->
       <div id="decision-alert" style="display:none;margin-bottom:16px;border:1px solid rgba(245,164,32,.5);
            background:var(--gold-bg);border-radius:12px;padding:14px 16px;
@@ -1009,6 +1012,53 @@ function mtfLabel(d) {
   }
   return `<div class="${cls} fs-12" style="font-weight:700;margin:0 0 10px;line-height:1.5;padding:6px 10px;border-radius:8px;background:${d.mtf_with_trend?'rgba(35,192,138,.10)':'rgba(245,164,32,.10)'}">${txt}</div>`;
 }
+// Today's Action — one plain-language line at the top of the dashboard
+function renderAction(t){
+  const el=document.getElementById('action-card'); if(!el) return;
+  if(!t){ el.style.display='none'; return; }
+  let cls='text2', icon='ℹ️', txt='';
+  if(t.market_closed){ txt='Market closed — no trade today.'; }
+  else {
+    const dir = t.signal&&(/BUY/.test(t.signal)?'BUY':(/SELL/.test(t.signal)?'SELL':null));
+    if(!dir){ txt='No trade signal today (WAIT / NO TRADE).'; }
+    else {
+      const pl=t.plan4h||{};
+      const entry = pl.zone_low!=null ? (fmt(pl.zone_low)+'–'+fmt(pl.zone_high)) : (pl.entry!=null?fmt(pl.entry):'—');
+      const sl = pl.stop!=null?fmt(pl.stop):'—', tp=pl.target!=null?fmt(pl.target):'—';
+      const reg=t.trend_regime, regw = reg==='DOWN'?'Downtrend':reg==='UP'?'Uptrend':'No clear trend';
+      if(t.mtf_with_trend===true){
+        cls=dir==='BUY'?'buy':'sell'; icon='✅';
+        txt=`<b>WITH-TREND ${dir} today</b> — take it. Entry ${entry} · stop ${sl} · target ${tp}.`;
+      } else if(t.mtf_with_trend===false){
+        cls='gold'; icon='⚠️';
+        const side = reg==='DOWN'?'sell':'buy';
+        txt=`<b>${regw} — ${side}-side only.</b> Today's signal is a counter-trend ${dir} → <b>skip / wait</b> (don't fight the trend).`;
+      } else {
+        cls='text2'; icon='ℹ️';
+        txt=`No clear daily trend — ${dir} signal. Trade with care. Entry ${entry} · stop ${sl} · target ${tp}.`;
+      }
+    }
+  }
+  const col = cls==='buy'?'var(--buy)':cls==='sell'?'var(--sell)':cls==='gold'?'var(--gold)':'var(--border2)';
+  el.style.display='block'; el.style.borderLeft='4px solid '+col;
+  el.innerHTML = `<div class="card-header"><span class="card-title">🎯 Today's Action</span></div>`
+    + `<div class="${cls}" style="font-weight:700;font-size:15px;line-height:1.5">${icon} ${txt}</div>`;
+  notifySetup(t);
+}
+function notifySetup(t){
+  try{
+    if(!t || t.mtf_with_trend!==true){ return; }      // only with-trend setups
+    const key='setup-notified-'+t.date;
+    if(localStorage.getItem(key)) return;             // one alert per day
+    if(!('Notification' in window)) return;
+    const dir=/BUY/.test(t.signal)?'BUY':'SELL', pl=t.plan4h||{};
+    const entry = pl.zone_low!=null ? (fmt(pl.zone_low)+'–'+fmt(pl.zone_high)) : (pl.entry!=null?fmt(pl.entry):'—');
+    const body=`WITH-TREND ${dir} today. Entry ${entry} · stop ${pl.stop!=null?fmt(pl.stop):'—'} · target ${pl.target!=null?fmt(pl.target):'—'}.`;
+    const fire=()=>{ new Notification('🎯 Gold — Trade Setup', {body}); localStorage.setItem(key,'1'); };
+    if(Notification.permission==='granted') fire();
+    else if(Notification.permission!=='denied') Notification.requestPermission().then(p=>{ if(p==='granted') fire(); });
+  }catch(e){}
+}
 function confBar(conf, sig) {
   const cls = sigColor(sig);
   return `<div class="conf-bar-wrap"><div class="conf-bar"><div class="conf-bar-fill ${cls}" style="width:${conf}%"></div></div><span class="conf-val">${conf}%</span></div>`;
@@ -1385,9 +1435,10 @@ async function loadDashboard(_attempt) {
 
   // Today signal card
   const t = dash.today;
-  window.TODAY = t;                       // for the Price Check box / flip bias
+  window.TODAY = t;                       // for the Price Check box / flip bias / action
   if (typeof priceCheck === 'function') priceCheck();
   if (typeof flipBias === 'function') flipBias();
+  if (typeof renderAction === 'function') renderAction(t);
   const sigCard = document.getElementById('d-signal-card');
   if (t.market_closed) {
     sigCard.style.borderTop = '3px solid var(--nd)';

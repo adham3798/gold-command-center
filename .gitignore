@@ -4,3 +4,4 @@ __pycache__/
 .claude/
 telegram_config.json
 telegram_sent.json
+setup_sent.json

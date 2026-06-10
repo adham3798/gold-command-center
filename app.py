@@ -1884,6 +1884,12 @@ def telegram_decision():
     ok, info = check_decision_telegram(force=True)
     return jsonify({'ok': ok, 'info': info})
 
+@app.route('/api/telegram-setup')
+def telegram_setup():
+    """Force-send today's WITH-TREND trade-setup alert (ignores the once-per-day guard)."""
+    ok, info = check_setup_telegram(force=True)
+    return jsonify({'ok': ok, 'info': info})
+
 @app.route('/api/dashboard')
 def dashboard():
     from datetime import timedelta
@@ -1987,6 +1993,46 @@ def check_decision_telegram(force=False):
         print("Telegram send failed:", info)
     return ok, info
 
+SETUP_SENT_FILE = os.path.join(_HERE, 'setup_sent.json')
+
+def _setup_message(day):
+    pl = day.get('plan4h') or {}
+    dirn = 'BUY' if 'BUY' in (day.get('signal') or '') else 'SELL'
+    entry = ('$%.2f–$%.2f' % (pl['zone_low'], pl['zone_high'])) if pl.get('zone_low') is not None else (
+            ('$%.2f' % pl['entry']) if pl.get('entry') is not None else '—')
+    return ('🎯 <b>TRADE SETUP</b> — %s\nWITH-TREND <b>%s</b> (daily trend is %s)\nEntry: %s\nStop: %s\nTarget: %s'
+            % (day['date'], dirn, str(day.get('trend_regime')).lower(), entry,
+               ('$%.2f' % pl['stop']) if pl.get('stop') is not None else '—',
+               ('$%.2f' % pl['target']) if pl.get('target') is not None else '—'))
+
+def check_setup_telegram(force=False):
+    """Alert once when TODAY's signal is a WITH-TREND trade (the trade to take), with
+       entry/stop/target. Skips counter-trend signals (those are 'skip/wait')."""
+    if not notify.configured():
+        return False, 'telegram not configured'
+    today = datetime.today().strftime('%Y-%m-%d')
+    day = build_day(today)
+    if day.get('market_closed'):
+        return False, 'market closed'
+    if not day.get('mtf_with_trend'):                 # only with-trend setups
+        return False, 'today is not a with-trend setup (%s)' % day.get('mtf_label')
+    try:
+        with open(SETUP_SENT_FILE, encoding='utf-8') as f:
+            sent = json.load(f)
+    except Exception:
+        sent = {}
+    if not force and sent.get('last') == today:
+        return False, 'already alerted for %s' % today
+    ok, info = notify.send(_setup_message(day))
+    if ok:
+        try:
+            with open(SETUP_SENT_FILE, 'w', encoding='utf-8') as f:
+                json.dump({'last': today}, f)
+        except Exception:
+            pass
+        print("Telegram trade-setup alert sent for", today)
+    return ok, info
+
 import time as _time
 def _auto_refresh_loop(interval=300):
     """Re-pull the Google Sheet + USD news every few minutes so data stays live."""
@@ -2004,6 +2050,10 @@ def _auto_refresh_loop(interval=300):
             check_decision_telegram()
         except Exception as e:
             print("Decision Telegram check error:", e)
+        try:
+            check_setup_telegram()
+        except Exception as e:
+            print("Setup Telegram check error:", e)
 
 def _startup_news_refresh():
     try:
@@ -2028,6 +2078,7 @@ def init_app():
     threading.Thread(target=_auto_refresh_loop, daemon=True).start()
     try:
         check_decision_telegram()      # fire on startup too, if today's close already qualifies
+        check_setup_telegram()         # ...and today's with-trend trade setup
     except Exception as e:
         print("Startup Telegram check skipped:", e)
 
