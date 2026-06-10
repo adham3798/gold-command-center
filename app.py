@@ -10,6 +10,7 @@ import engine
 import news
 import notify
 import journal
+import trade_journal as tj
 
 app = Flask(__name__)
 import re, urllib.parse
@@ -2053,6 +2054,116 @@ def _record_today_journal():
 def api_journal():
     return jsonify(journal.stats())
 
+# ── TRADE ENGINE (primary scorecard: did the actual trade make money?) ───────────
+def _norm_candles(cands):
+    """Copies with a zero-padded ISO dt so the engine's string-based ordering/last_seen
+       is correct even for the sheet's non-padded hours ('7:00:00')."""
+    out = []
+    for c in cands:
+        d = _cdt(c)
+        if d == datetime.min or c.get('close') is None:
+            continue
+        out.append({'dt': d.strftime('%Y-%m-%d %H:%M:%S'),
+                    'open': c.get('open'), 'high': c.get('high'),
+                    'low': c.get('low'), 'close': c.get('close')})
+    return out
+
+def _place_today_trade():
+    """Place TODAY's WITH-TREND setup once (entry/stop/target from the 4H plan).
+       Skips counter-trend and non-directional/WAIT days. place() dedups by dir+entry."""
+    today = datetime.today().strftime('%Y-%m-%d')
+    day = build_day(today)
+    if day.get('market_closed') or day.get('mtf_with_trend') is not True:
+        return
+    pl = day.get('plan4h') or {}
+    d, entry, stop, take = pl.get('dir'), pl.get('entry'), pl.get('stop'), pl.get('target')
+    if d not in ('BUY', 'SELL') or None in (entry, stop, take):
+        return
+    tid = tj.place(d, entry, stop, take, source=day.get('signal_src') or 'dashboard',
+                   note='%s %s' % (today, day.get('mtf_label') or ''))
+    if tid:
+        print('Trade engine: placed %s %s entry %s -> %s' % (today, d, entry, tid))
+        _mirror_trades()
+
+def _prime_trade_seen():
+    """First run only: set last_seen to the latest EXISTING candle per feed so a freshly
+       placed trade is driven only by candles that close AFTER it — never back-driven
+       through history."""
+    db = tj._load()
+    changed = False
+    for tf, key in (('4h', 'h4'), ('1h', 'h1')):
+        if not db['last_seen'].get(tf):
+            nc = _norm_candles(DATA.get(key, []))
+            if nc:
+                db['last_seen'][tf] = max(c['dt'] for c in nc)
+                changed = True
+    if changed:
+        tj._save(db)
+
+def _process_trade_engine():
+    """Drive entries/exits with CLOSED candles (forming bar already dropped upstream)."""
+    ch = tj.process_candles('4h', _norm_candles(DATA.get('h4', [])))
+    ch += tj.process_candles('1h', _norm_candles(DATA.get('h1', [])))
+    if ch:
+        _mirror_trades()
+    return ch
+
+def _mirror_trades():
+    """Mirror the full trade db (one JSON blob per trade + last_seen) to the sheet
+       TRADES tab via the webhook, so the live track record survives redeploys."""
+    url = os.environ.get('ALERT_WEBHOOK_URL')
+    if not url:
+        return
+    try:
+        db = tj._load()
+        rows = [{'id': tid, 'status': t.get('status'), 'json': json.dumps(t)}
+                for tid, t in db.get('trades', {}).items()]
+        rows.append({'id': '__last_seen__', 'status': 'meta', 'json': json.dumps(db.get('last_seen', {}))})
+        req.post(url, json={'trades': rows}, timeout=15)
+    except Exception as e:
+        print('Trades mirror failed:', e)
+
+def _restore_trades_from_sheet():
+    """Re-hydrate the trade db from the sheet TRADES tab on boot (full fidelity via the
+       JSON blob). Local (current-run) trades win over sheet copies of the same id."""
+    try:
+        df = _read_tab('TRADES')
+    except Exception as e:
+        print('Trades restore skipped (no TRADES tab yet):', e); return
+    cId = _find_col(df, 'Id', 'ID'); cJson = _find_col(df, 'Json', 'JSON')
+    if not cId or not cJson:
+        return
+    sheet_trades, sheet_seen = {}, {}
+    for _, r in df.iterrows():
+        tid = str(r.get(cId, '')).strip()
+        blob = r.get(cJson)
+        if not tid or tid.lower() == 'nan' or not isinstance(blob, str):
+            continue
+        try:
+            obj = json.loads(blob)
+        except Exception:
+            continue
+        if tid == '__last_seen__':
+            sheet_seen = obj if isinstance(obj, dict) else {}
+        elif isinstance(obj, dict) and obj.get('id'):
+            sheet_trades[tid] = obj
+    if not sheet_trades and not sheet_seen:
+        return
+    db = tj._load()
+    merged_trades = dict(sheet_trades)
+    merged_trades.update(db.get('trades', {}))          # local current-run wins
+    merged_seen = dict(sheet_seen)
+    for tf, d in db.get('last_seen', {}).items():        # keep the later last_seen per tf
+        if d > merged_seen.get(tf, ''):
+            merged_seen[tf] = d
+    tj._save({'trades': merged_trades, 'last_seen': merged_seen})
+    print('Trades restored from sheet: %d trades (local had %d)'
+          % (len(merged_trades), len(db.get('trades', {}))))
+
+@app.route('/api/track-record')
+def api_track_record():
+    return jsonify(tj.stats())
+
 # ── persist the daily alert log to the Google Sheet (ALERT_LOG tab) ──────────────
 ALERT_LOG_FILE = os.path.join(_HERE, 'alert_log.json')   # local fallback (ephemeral on Render)
 
@@ -2277,6 +2388,11 @@ def _auto_refresh_loop(interval=300):
                 _mirror_journal()
         except Exception as e:
             print("Journal error:", e)
+        try:
+            _place_today_trade()                         # place today's with-trend setup
+            _process_trade_engine()                      # drive fills/exits on closed candles
+        except Exception as e:
+            print("Trade-engine error:", e)
 
 def _startup_news_refresh():
     try:
@@ -2306,6 +2422,10 @@ def init_app():
         _restore_journal_from_sheet()  # re-hydrate the journal from the sheet (survive redeploys)
         _record_today_journal()        # ...and log today's prediction (before close)
         journal.grade_pending(DATA['prices'])
+        _restore_trades_from_sheet()   # re-hydrate the trade engine from the sheet
+        _prime_trade_seen()            # ...skip historical candles on first boot
+        _place_today_trade()           # ...place today's with-trend setup
+        _process_trade_engine()        # ...and drive any fills/exits
     except Exception as e:
         print("Startup Telegram check skipped:", e)
 

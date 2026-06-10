@@ -623,7 +623,10 @@ input,select,textarea{font-family:inherit}
       <!-- Reversal Watch (down -> up) -->
       <div class="card mb-20" id="reversal-card" style="display:none"></div>
 
-      <!-- Prediction Scorecard (the un-fakeable forward track record) -->
+      <!-- Trades / Live Track Record (PRIMARY: did the real trade make money?) -->
+      <div class="card mb-20" id="traderec-card" style="display:none"></div>
+
+      <!-- Prediction Scorecard (secondary: was the daily direction right?) -->
       <div class="card mb-20" id="journal-card" style="display:none"></div>
 
       <!-- OHLC Levels: Last Close + Today (live) -->
@@ -1133,7 +1136,7 @@ async function renderJournal(){
   else { badge='⚠ UNPROVEN'; bcls='gold'; col='var(--gold)'; }
   const wcls = wr==null?'text3':(wr>=50?'buy':'sell');
   el.style.display='block'; el.style.borderLeft='4px solid '+col;
-  el.innerHTML = `<div class="card-header"><span class="card-title">🎯 Prediction Scorecard</span>`
+  el.innerHTML = `<div class="card-header"><span class="card-title">🎯 Prediction Scorecard <span class="text3 fs-11">· direction-only check</span></span>`
     + `<span class="${bcls} fs-11" style="font-weight:800">${badge}</span></div>`
     + `<div style="display:flex;align-items:baseline;gap:10px;margin-bottom:6px">`
     + `<span class="${wcls}" style="font-size:30px;font-weight:800">${wr==null?'—':wr+'%'}</span>`
@@ -1146,6 +1149,37 @@ async function renderJournal(){
     + `<div class="text3 fs-11" style="margin-bottom:8px">${s.n_pending} pending · ${s.n_wait} wait-days (excluded from win rate)</div>`
     + jSpark((s.rolling20||[]).map(r=>r.win_rate))
     + `<div class="text3 fs-11" style="margin-top:2px">rolling-20 win rate (dashed = 50% coin-flip line)</div>`;
+}
+// Trades / Live Track Record — PRIMARY scorecard (real trade rules: 4H-close entry, touch exits)
+async function renderTradeRecord(){
+  const el=document.getElementById('traderec-card'); if(!el) return;
+  let s; try{ s=await fetch('/api/track-record').then(r=>r.json()); }catch(e){ return; }
+  const wr=s.win_rate_pct, ci=s.ci95_pct||[0,0], lo=ci[0], hi=ci[1];
+  let badge,bcls,col;
+  if(!s.closed){ badge='BUILDING — needs closed trades'; bcls='text3'; col='var(--border2)'; }
+  else if(lo>50){ badge='✓ EDGE CONFIRMED'; bcls='buy'; col='var(--buy)'; }
+  else if(hi<50){ badge='✗ BELOW COIN FLIP'; bcls='sell'; col='var(--sell)'; }
+  else { badge='⚠ UNPROVEN'; bcls='gold'; col='var(--gold)'; }
+  const pnl=s.total_pnl, pcls=pnl==null?'text3':(pnl>=0?'buy':'sell');
+  const rx=s.exit_reasons||{};
+  const reasonChips=[['take_touch','TP',(rx.take_touch||0)+(rx.take_gap||0)],['stop_touch','SL',(rx.stop_touch||0)+(rx.stop_gap||0)],['trend_break_4h','trend-break',rx.trend_break_4h||0],['expiry','3-day stop',rx.expiry||0]]
+    .map(([k,lbl,v])=>`<span class="text3 fs-11" style="margin-right:10px">${lbl}: <b class="text2">${v}</b></span>`).join('');
+  const openRows=(s.open||[]).map(o=>`<div class="text3 fs-11">● OPEN ${o.dir} @ ${fmt(o.fill&&o.fill.price)} · SL ${fmt(o.stop)} · TP ${fmt(o.take)}${o.h4_against_run?` · ${o.h4_against_run} 4H against`:''}</div>`).join('');
+  const pendRows=(s.pending||[]).map(p=>`<div class="text3 fs-11">○ PENDING ${p.dir} entry ${fmt(p.entry)} · waited ${p.h4_waited} 4H close${p.h4_waited===1?'':'s'}</div>`).join('');
+  el.style.display='block'; el.style.borderLeft='4px solid '+col;
+  el.innerHTML = `<div class="card-header"><span class="card-title">📈 Live Track Record <span class="text3 fs-11">· real trade rules</span></span>`
+    + `<span class="${bcls} fs-11" style="font-weight:800">${badge}</span></div>`
+    + `<div style="display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;margin-bottom:6px">`
+    + `<span class="${wr==null?'text3':(wr>=50?'buy':'sell')}" style="font-size:30px;font-weight:800">${wr==null?'—':wr+'%'}</span>`
+    + `<span class="text3 fs-12">${s.wins}/${s.closed} wins</span>`
+    + `<span class="${pcls}" style="font-weight:800;font-size:16px;margin-left:6px">${pnl==null?'':(pnl>=0?'+':'−')+'$'+fmtN(Math.abs(pnl))}</span>`
+    + `<span class="text3 fs-12">P&amp;L</span></div>`
+    + `<div class="text2 fs-12" style="margin-bottom:6px">95% win band <b>${lo}%–${hi}%</b>`
+    + (s.closed?(lo>50||hi<50?` · <span class="${bcls}">distinguishable from a coin flip</span>`:` · <span class="gold">not proven yet</span>`):'')+`</div>`
+    + `<div class="text3 fs-11" style="margin-bottom:8px">avg ${s.avg_r==null?'—':(s.avg_r>=0?'+':'')+s.avg_r+'R'} · expectancy ${s.expectancy_usd==null?'—':'$'+s.expectancy_usd}/trade · avg entry slippage ${s.avg_entry_slippage==null?'—':'$'+s.avg_entry_slippage}</div>`
+    + `<div style="margin-bottom:8px">${reasonChips}</div>`
+    + (openRows||pendRows ? `<div style="border-top:1px solid var(--border);padding-top:8px">${openRows}${pendRows}</div>` : '')
+    + `<div class="text3 fs-11" style="margin-top:6px">Entries confirm on a 4H close · stops/targets exit on touch (1H)</div>`;
 }
 function confBar(conf, sig) {
   const cls = sigColor(sig);
@@ -2326,6 +2360,7 @@ document.addEventListener('DOMContentLoaded', () => {
   loadDashboard();
   setInterval(fetchLive, 30000);
   if (typeof renderAlerts === 'function') { renderAlerts(); setInterval(renderAlerts, 300000); }
+  if (typeof renderTradeRecord === 'function') { renderTradeRecord(); setInterval(renderTradeRecord, 300000); }
   if (typeof renderJournal === 'function') { renderJournal(); setInterval(renderJournal, 300000); }
 });
 </script>

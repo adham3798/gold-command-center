@@ -8,3 +8,5 @@ setup_sent.json
 alert_log.json
 prediction_journal.json
 prediction_journal.json.tmp
+trade_journal.json
+trade_journal.json.tmp
