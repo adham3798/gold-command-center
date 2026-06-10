@@ -2,7 +2,7 @@
 from flask import Flask, render_template, jsonify, request, send_file
 import pandas as pd
 import json
-from datetime import datetime
+from datetime import datetime, timedelta
 from calendar import monthrange
 import os
 import requests as req
@@ -235,17 +235,25 @@ def load_data():
         print("Candle load skipped:", e); h1, h4 = DATA.get('h1', []), DATA.get('h4', [])
 
     # keep the 1-hour series CURRENT even if the sheet's H1_DATA tab lags: pull fresh
-    # 1H gold candles from a live source and append the ones newer than the sheet's latest
+    # 1H gold candles from a live source and append the ones newer than the sheet's latest.
+    # IMPORTANT: drop the currently-FORMING candle (Yahoo returns the in-progress bar as the
+    # last element) so the trend updates only on a CLOSED hourly candle, not an intrabar tick.
     try:
         live = fetch_live_h1()
         if live:
-            latest = max((str(c.get('dt', '')) for c in h1), default='')
-            fresh = [c for c in live if str(c.get('dt', '')) > latest]
+            now = datetime.utcnow()
+            live = [c for c in live if _cdt(c) != datetime.min and _cdt(c) + timedelta(hours=1) <= now]
+            latest = max((_cdt(c) for c in h1), default=datetime.min)
+            fresh = [c for c in live if _cdt(c) > latest]
             if fresh:
                 h1 = h1 + fresh
-                print("Live 1H: added %d fresh candles (newest %s)" % (len(fresh), fresh[-1]['dt']))
+                print("Live 1H: added %d fresh CLOSED candles (newest %s)" % (len(fresh), fresh[-1]['dt']))
     except Exception as e:
         print("Live 1H merge skipped:", e)
+
+    # sort both intraday series CHRONOLOGICALLY (not by string — non-padded hours scramble it)
+    h1 = sorted(h1, key=_cdt)
+    h4 = sorted(h4, key=_cdt)
 
     # ── WEEKLY_FORECAST: your sheet's own Expected Direction (source of truth) ──
     try:
@@ -407,6 +415,18 @@ def _signstage_range(date_str):
     if not m:
         return None
     return _matching_moves(date_str, m['sign'], m['stage']).get('avg_range')
+
+def _cdt(c):
+    """Parse a candle's timestamp to a real datetime for CHRONOLOGICAL sorting.
+       Critical: some sheet tabs store non-zero-padded hours ('7:00:00'), so a plain
+       string sort scrambles the order (single-digit hours sort after '23:00')."""
+    s = str(c.get('dt', '')).strip()
+    for fmt in ('%Y-%m-%d %H:%M:%S', '%Y-%m-%d %H:%M', '%Y-%m-%dT%H:%M:%S', '%Y-%m-%dT%H:%M', '%Y-%m-%d'):
+        try:
+            return datetime.strptime(s, fmt)
+        except ValueError:
+            continue
+    return datetime.min
 
 def _trend_of(seq, n):
     """seq = list of (close, open) recent-last. Trend over the last n candles =
@@ -1855,8 +1875,8 @@ def trends():
     today_str = datetime.today().strftime('%Y-%m-%d')
     pdays = sorted(DATA['prices'])
     daily_seq = [(DATA['prices'][d].get('close'), DATA['prices'][d].get('open')) for d in pdays]
-    h4 = sorted(DATA.get('h4', []), key=lambda c: str(c.get('dt', '')))
-    h1 = sorted(DATA.get('h1', []), key=lambda c: str(c.get('dt', '')))
+    h4 = sorted(DATA.get('h4', []), key=_cdt)   # chronological, not string (non-padded hours)
+    h1 = sorted(DATA.get('h1', []), key=_cdt)
     h4_seq = [(c.get('close'), c.get('open')) for c in h4]
     h1_seq = [(c.get('close'), c.get('open')) for c in h1]
     h1_last = str(h1[-1].get('dt', ''))[:10] if h1 else ''

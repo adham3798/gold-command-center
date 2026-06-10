@@ -19,8 +19,8 @@ def main():
         seq = [(P[d]['close'], P[d]['open']) for d in days if d <= D]
         t = app._trend_of(seq, 5); return t['dir'] if t else None
 
-    h4 = sorted(app.DATA.get('h4', []), key=lambda c: str(c.get('dt', '')))
-    h1 = sorted(app.DATA.get('h1', []), key=lambda c: str(c.get('dt', '')))
+    h4 = sorted(app.DATA.get('h4', []), key=app._cdt)   # chronological (non-padded hours)
+    h1 = sorted(app.DATA.get('h1', []), key=app._cdt)
     def tf_trend(cands, D, n):
         seq = [(c['close'], c['open']) for c in cands
                if str(c.get('dt', ''))[:10] <= D and c.get('close') is not None and c.get('open') is not None]
