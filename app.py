@@ -9,6 +9,7 @@ import requests as req
 import engine
 import news
 import notify
+import journal
 
 app = Flask(__name__)
 import re, urllib.parse
@@ -1966,6 +1967,44 @@ def _recent_alert_entries(n=20):
 def alerts(n=20):
     return jsonify(_recent_alert_entries(n))
 
+# ── PREDICTION JOURNAL (the un-fakeable forward track record) ────────────────────
+def _mirror_journal():
+    """Best-effort: mirror the whole journal to the sheet (JOURNAL tab) via the same
+       Apps Script webhook, so the forward record survives Render's ephemeral disk."""
+    url = os.environ.get('ALERT_WEBHOOK_URL')
+    if not url:
+        return
+    try:
+        j = journal._load()
+        rows = [{'date': d, 'signal': r.get('signal'), 'source': r.get('source'),
+                 'logged_at': r.get('logged_at_utc'),
+                 'result': (r.get('outcome') or {}).get('result', 'pending') if r.get('outcome') else 'pending',
+                 'move': (r.get('outcome') or {}).get('move', '') if r.get('outcome') else ''}
+                for d, r in sorted(j.items())]
+        req.post(url, json={'journal': rows}, timeout=15)
+    except Exception as e:
+        print('Journal mirror failed:', e)
+
+def _record_today_journal():
+    """Record TODAY's FINAL signal once, BEFORE the day closes (so it can't be back-filled).
+       Records WAIT when the wait-for-4H safeguard is active."""
+    today = datetime.today().strftime('%Y-%m-%d')
+    bar = DATA['prices'].get(today)
+    if bar and bar.get('close') is not None:
+        return                              # day already closed — too late for an honest call
+    day = build_day(today)
+    if day.get('market_closed'):
+        return
+    sig = day.get('signal') or ''
+    rec = 'WAIT' if day.get('wait_4h') else ('BUY' if 'BUY' in sig else ('SELL' if 'SELL' in sig else 'WAIT'))
+    if journal.record_today(today, rec, source='dashboard'):
+        print('Journal: recorded %s -> %s' % (today, rec))
+        _mirror_journal()
+
+@app.route('/api/journal')
+def api_journal():
+    return jsonify(journal.stats())
+
 # ── persist the daily alert log to the Google Sheet (ALERT_LOG tab) ──────────────
 ALERT_LOG_FILE = os.path.join(_HERE, 'alert_log.json')   # local fallback (ephemeral on Render)
 
@@ -2184,6 +2223,12 @@ def _auto_refresh_loop(interval=300):
             _log_alerts()
         except Exception as e:
             print("Alert-log error:", e)
+        try:
+            _record_today_journal()                     # log today's call before close
+            if journal.grade_pending(DATA['prices']):    # grade any day that just closed
+                _mirror_journal()
+        except Exception as e:
+            print("Journal error:", e)
 
 def _startup_news_refresh():
     try:
@@ -2210,6 +2255,8 @@ def init_app():
         check_decision_telegram()      # fire on startup too, if today's close already qualifies
         check_setup_telegram()         # ...and today's with-trend trade setup
         _log_alerts()                  # ...and persist today's alert-log row
+        _record_today_journal()        # ...and log today's prediction (before close)
+        journal.grade_pending(DATA['prices'])
     except Exception as e:
         print("Startup Telegram check skipped:", e)
 

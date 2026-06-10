@@ -623,6 +623,9 @@ input,select,textarea{font-family:inherit}
       <!-- Reversal Watch (down -> up) -->
       <div class="card mb-20" id="reversal-card" style="display:none"></div>
 
+      <!-- Prediction Scorecard (the un-fakeable forward track record) -->
+      <div class="card mb-20" id="journal-card" style="display:none"></div>
+
       <!-- OHLC Levels: Last Close + Today (live) -->
       <div class="card mb-20">
         <div class="card-header"><span class="card-title">Price Levels — Last Close &amp; Today (live)</span></div>
@@ -1108,6 +1111,41 @@ async function renderAlerts(){
       + `<span class="${dc}" style="font-weight:700">${arr} ${r.dir}</span>`
       + `<span>${wt}${w4}</span><span style="margin-left:auto">${oc(r.outcome)}</span></div>`;
   }).join('');
+}
+// Prediction Scorecard — the live forward track record (un-fakeable)
+function jSpark(vals){
+  if(!vals || vals.length<2) return '<div class="text3 fs-11">(rolling line appears after ~2 graded days)</div>';
+  const W=280,H=46,n=vals.length, x=i=>i/(n-1)*W, y=v=>H-(v/100)*(H-4)-2;
+  const pts=vals.map((v,i)=>x(i).toFixed(1)+','+y(v).toFixed(1)).join(' ');
+  const mid=y(50).toFixed(1);
+  return `<svg viewBox="0 0 ${W} ${H}" width="100%" height="46" preserveAspectRatio="none" style="display:block">
+    <line x1="0" y1="${mid}" x2="${W}" y2="${mid}" stroke="var(--border2)" stroke-dasharray="3 3" stroke-width="1"/>
+    <polyline points="${pts}" fill="none" stroke="var(--gold)" stroke-width="2"/></svg>`;
+}
+async function renderJournal(){
+  const el=document.getElementById('journal-card'); if(!el) return;
+  let s; try{ s=await fetch('/api/journal').then(r=>r.json()); }catch(e){ return; }
+  const wr=s.win_rate_pct, ci=s.ci95_pct||[0,0], lo=ci[0], hi=ci[1];
+  let badge, bcls, col;
+  if(!s.n_graded){ badge='BUILDING — needs data'; bcls='text3'; col='var(--border2)'; }
+  else if(s.distinguishable_from_coinflip && lo>50){ badge='✓ EDGE CONFIRMED'; bcls='buy'; col='var(--buy)'; }
+  else if(s.distinguishable_from_coinflip && hi<50){ badge='✗ BELOW COIN FLIP'; bcls='sell'; col='var(--sell)'; }
+  else { badge='⚠ UNPROVEN'; bcls='gold'; col='var(--gold)'; }
+  const wcls = wr==null?'text3':(wr>=50?'buy':'sell');
+  el.style.display='block'; el.style.borderLeft='4px solid '+col;
+  el.innerHTML = `<div class="card-header"><span class="card-title">🎯 Prediction Scorecard</span>`
+    + `<span class="${bcls} fs-11" style="font-weight:800">${badge}</span></div>`
+    + `<div style="display:flex;align-items:baseline;gap:10px;margin-bottom:6px">`
+    + `<span class="${wcls}" style="font-size:30px;font-weight:800">${wr==null?'—':wr+'%'}</span>`
+    + `<span class="text3 fs-12">${s.wins}/${s.n_graded} correct · live forward record</span></div>`
+    + `<div class="text2 fs-12" style="margin-bottom:6px">95% confidence band: <b>${lo}%–${hi}%</b>`
+    + (s.n_graded ? (s.distinguishable_from_coinflip
+        ? ` · <span class="${bcls}">distinguishable from a coin flip</span>`
+        : ` · band spans 50% → <span class="gold">not proven yet</span>`) : '')
+    + `</div>`
+    + `<div class="text3 fs-11" style="margin-bottom:8px">${s.n_pending} pending · ${s.n_wait} wait-days (excluded from win rate)</div>`
+    + jSpark((s.rolling20||[]).map(r=>r.win_rate))
+    + `<div class="text3 fs-11" style="margin-top:2px">rolling-20 win rate (dashed = 50% coin-flip line)</div>`;
 }
 function confBar(conf, sig) {
   const cls = sigColor(sig);
@@ -2288,6 +2326,7 @@ document.addEventListener('DOMContentLoaded', () => {
   loadDashboard();
   setInterval(fetchLive, 30000);
   if (typeof renderAlerts === 'function') { renderAlerts(); setInterval(renderAlerts, 300000); }
+  if (typeof renderJournal === 'function') { renderJournal(); setInterval(renderJournal, 300000); }
 });
 </script>
 </body>

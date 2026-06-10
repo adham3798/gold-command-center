@@ -6,3 +6,5 @@ telegram_config.json
 telegram_sent.json
 setup_sent.json
 alert_log.json
+prediction_journal.json
+prediction_journal.json.tmp
