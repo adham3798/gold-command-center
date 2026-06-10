@@ -337,6 +337,22 @@ def _signstage_range(date_str):
         return None
     return _matching_moves(date_str, m['sign'], m['stage']).get('avg_range')
 
+def _trend_of(seq, n):
+    """seq = list of (close, open) recent-last. Trend over the last n candles =
+       direction of the net move; FLAT only when net is small vs the window's range
+       (i.e. choppy / no real direction)."""
+    seq = [(c, o) for c, o in seq if c is not None and o is not None][-n:]
+    if len(seq) < 2:
+        return None
+    closes = [c for c, o in seq]
+    net = closes[-1] - closes[0]
+    rng = (max(closes) - min(closes)) or 1
+    bull = sum(1 for c, o in seq if c >= o)
+    if abs(net) < 0.25 * rng:  d = 'FLAT'      # choppy: no clear direction
+    elif net > 0:              d = 'UP'
+    else:                      d = 'DOWN'
+    return {'dir': d, 'net': round(net, 2), 'bull': bull, 'bars': len(seq), 'last': round(closes[-1], 2)}
+
 def _combined_move(date_str):
     """Take-profit move = average of (recent 30-day range) and (this day's moon
        sign+stage average range). Blends current volatility with the astro setup."""
@@ -908,23 +924,18 @@ def _level_sltp(direction, entry, lv):
         return round(rv + 2, 2), (round(tv, 2) if tv is not None else None), _LV_NAME.get(rk, rk), tk
 
 def _plan_sltp(date_str, direction, entry, atr):
-    """Stop/target for the plan. Level-based (rule ii); ATR-based 1:1 only as a fallback
-       when the pivot ladder can't supply both a stop and a target.
+    """ATR-based stop/target (the version that backtested positive):
+       stop = 1.5×ATR from entry, target = 1:1, breakeven at 50% to target.
        Returns (stop, target, be, stop_ref, target_ref)."""
-    lv = _pivot_levels(date_str)
-    stop = tgt = sref = tref = None
-    if lv:
-        stop, tgt, sref, tref = _level_sltp(direction, entry, lv)
-    if stop is None or tgt is None:           # fallback: 1.5×ATR, 1:1
-        sd = round(H4_ATR_MULT * atr, 2) if atr else None
-        if sd:
-            if direction == 'BUY':
-                stop, tgt = round(entry - sd, 2), round(entry + sd, 2)
-            else:
-                stop, tgt = round(entry + sd, 2), round(entry - sd, 2)
-            sref = sref or ('%g×ATR' % H4_ATR_MULT); tref = tref or '1:1'
-    be = round(entry + 0.5 * (tgt - entry), 2) if (stop is not None and tgt is not None) else None
-    return stop, tgt, be, sref, tref
+    if not atr or entry is None:
+        return None, None, None, None, None
+    sd = round(H4_ATR_MULT * atr, 2)
+    td = round(H4_RR * sd, 2)
+    if direction == 'BUY':
+        stop, tgt, be = round(entry - sd, 2), round(entry + td, 2), round(entry + 0.5 * td, 2)
+    else:
+        stop, tgt, be = round(entry + sd, 2), round(entry - td, 2), round(entry - 0.5 * td, 2)
+    return stop, tgt, be, '%g×ATR' % H4_ATR_MULT, '%g:1' % H4_RR
 
 def build_4h_plan(date_str, direction, today, entry=None, entry_label='pivot point'):
     """Build the per-day 4-hour plan dict, or None if not applicable.
@@ -1039,26 +1050,21 @@ def build_decision_plan(date_str, dc, today):
        - direction = dc['dir'] (net of the 3 days before the decision day)
        - ENTRY = a ZONE $8-10 beyond the decision day's extreme (sell above its HIGH /
          buy below its LOW) — you fade the bounce back into the trend
-       - STOP  = $20 beyond the decision day's HIGH/LOW
-       - TARGET= entry ∓ combined move  (avg of recent-30d range & sign+stage range)
-       Fills when price trades into the zone; then W=target / L=stop."""
+       - STOP/TARGET = 1.5×ATR / 1:1 with a breakeven trail (same as the normal plan)
+       Fills when price trades into the zone; then BE-trail management on the candles."""
     direction = dc['dir']; sell = direction == 'SELL'
     dhigh = dc.get('decision_high'); dlow = dc.get('decision_low')
-    if dhigh is None or dlow is None:
-        return None
-    move = _combined_move(date_str)
-    if not move:
+    atr = _h4_atr(date_str)
+    if dhigh is None or dlow is None or not atr:
         return None
     if sell:
-        zlo = round(dhigh + 8, 2); zhi = round(dhigh + 10, 2)     # sell zone (above the high)
-        entry = zlo                                               # near edge = entry reference
-        stop  = round(dhigh + 20, 2)
-        tgt   = round(entry - move, 2)
+        zlo = round(dhigh + 8, 2); zhi = round(dhigh + 10, 2); entry = zlo   # sell zone, near edge = entry
     else:
-        zhi = round(dlow - 8, 2); zlo = round(dlow - 10, 2)       # buy zone (below the low)
-        entry = zhi
-        stop  = round(dlow - 20, 2)
-        tgt   = round(entry + move, 2)
+        zhi = round(dlow - 8, 2); zlo = round(dlow - 10, 2); entry = zhi     # buy zone
+    sl, tgt, be, stop_ref, target_ref = _plan_sltp(date_str, direction, entry, atr)
+    if sl is None or tgt is None or be is None:
+        return None
+    stop_dist = round(abs(entry - sl), 2); tp_dist = round(abs(tgt - entry), 2)
 
     win_h1, win_days = _h1_window(date_str)
     if not win_h1:                            # no 1-hour data -> use 4-hour intraday
@@ -1066,8 +1072,8 @@ def build_decision_plan(date_str, dc, today):
     is_past = date_str < today
     day_candles = [{**_pub_candle(r), 'tags': []} for r in _H4_BY_DAY.get(date_str, [])]
 
-    # walk candles: fill when price trades INTO the zone, then target / stop
-    filled = False; fill_time = None; outcome = None
+    # fill when price trades INTO the zone, then breakeven-trail management
+    filled = False; fill_time = None; armed = False; outcome = None
     for r in (win_h1 or []):
         h, l = r['h'], r['l']
         if not filled:
@@ -1075,39 +1081,49 @@ def build_decision_plan(date_str, dc, today):
                 filled = True; fill_time = r['time']
             else:
                 continue
-        if sell:
-            if h >= stop: outcome = 'L'; break
-            if l <= tgt:  outcome = 'W'; break
-        else:
-            if l <= stop: outcome = 'L'; break
-            if h >= tgt:  outcome = 'W'; break
+        if outcome is None:
+            if sell:
+                if not armed:
+                    if h >= sl:  outcome = 'L'; break
+                    if l <= tgt: outcome = 'W'; break
+                    if l <= be:  armed = True
+                else:
+                    if h >= entry: outcome = 'BE'; break
+                    if l <= tgt:   outcome = 'W'; break
+            else:
+                if not armed:
+                    if l <= sl:  outcome = 'L'; break
+                    if h >= tgt: outcome = 'W'; break
+                    if h >= be:  armed = True
+                else:
+                    if l <= entry: outcome = 'BE'; break
+                    if h >= tgt:   outcome = 'W'; break
+    if outcome is None and filled and is_past and win_days and win_days[-1] < today:
+        outcome = 'BE' if armed else 'L'
     if not filled and is_past and win_days and win_days[-1] < today:
         outcome = 'NF'
 
-    adv = _decision_advice(direction, entry, zlo, zhi, stop, tgt, move, dc,
-                           filled, fill_time, outcome, is_past, date_str == today)
+    adv = _decision_advice(direction, entry, zlo, zhi, sl, tgt, dc, filled, fill_time, outcome, is_past, date_str == today)
     return {'dir': direction, 'decision': True,
             'zone_low': zlo, 'zone_high': zhi, 'entry': entry, 'entry_label': 'decision zone',
-            'stop': stop, 'stop_ref': ('high +$20' if sell else 'low −$20'),
-            'target': tgt, 'target_ref': 'avg move $%.0f' % move, 'be': None,
-            'move': move, 'move_recent': DATA.get('moves', {}).get('recent_range'),
-            'move_signstage': _signstage_range(date_str),
+            'stop': sl, 'stop_ref': stop_ref, 'target': tgt, 'target_ref': target_ref, 'be': be,
+            'stop_dist': stop_dist, 'tp_dist': tp_dist,
             'trend_net': dc.get('trend_net'), 'prev_decision_date': dc.get('prev'),
             'filled': filled, 'fill_time': fill_time, 'outcome': outcome,
             'candles': day_candles, 'n_candles': len(day_candles),
             'trigger': 'price trades into the zone', 'advice': adv}
 
-def _decision_advice(direction, entry, zlo, zhi, stop, tgt, move, dc, filled, fill_time, outcome, is_past, is_today):
+def _decision_advice(direction, entry, zlo, zhi, stop, tgt, dc, filled, fill_time, outcome, is_past, is_today):
     zone = '$%.2f–$%.2f' % (zlo, zhi)
-    base = ('%s zone %s · stop $%.2f · target $%.2f (move $%.0f)'
-            % (direction, zone, stop, tgt, move))
+    base = '%s zone %s · stop $%.2f · target $%.2f (1:1, BE trail)' % (direction, zone, stop, tgt)
     trend = 'downtrend' if dc.get('dir') == 'SELL' else 'uptrend'
-    if outcome == 'W':  return 'WIN — %s. Trade hit target $%.2f.' % (base, tgt)
+    if outcome == 'W':  return 'WIN — %s. Hit target $%.2f.' % (base, tgt)
+    if outcome == 'BE': return 'BREAKEVEN — %s. Trailed to entry (0).' % base
     if outcome == 'L':  return 'LOSS — %s. Stopped at $%.2f.' % (base, stop)
     if outcome == 'NF': return 'NO TRADE — price never reached the %s entry zone %s.' % (direction, zone)
     if is_today:
-        return ('%s — %s. The decision day was a pause in the %s; %s the bounce into %s.'
-                % ('LIVE (filled)' if filled else 'WAITING', base, trend, 'sell' if direction=='SELL' else 'buy', zone))
+        return ('%s — %s. Decision day was a pause in the %s; %s the bounce into %s.'
+                % ('LIVE (filled)' if filled else 'WAITING', base, trend, 'sell' if direction == 'SELL' else 'buy', zone))
     return ('PLAN — decision day was a pause in the %s, so trend resumes: %s. Enter when price trades into %s.'
             % (trend, base, zone))
 
@@ -1726,6 +1742,27 @@ def stats():
     })
 
 # ── DASHBOARD SUMMARY ─────────────────────────────────────────────────────────
+@app.route('/api/trends')
+def trends():
+    """Trend direction on three timeframes: daily / 4-hour / 1-hour."""
+    today_str = datetime.today().strftime('%Y-%m-%d')
+    pdays = sorted(DATA['prices'])
+    daily_seq = [(DATA['prices'][d].get('close'), DATA['prices'][d].get('open')) for d in pdays]
+    h4 = sorted(DATA.get('h4', []), key=lambda c: str(c.get('dt', '')))
+    h1 = sorted(DATA.get('h1', []), key=lambda c: str(c.get('dt', '')))
+    h4_seq = [(c.get('close'), c.get('open')) for c in h4]
+    h1_seq = [(c.get('close'), c.get('open')) for c in h1]
+    h1_last = str(h1[-1].get('dt', ''))[:10] if h1 else ''
+    h4_last = str(h4[-1].get('dt', ''))[:10] if h4 else ''
+    return jsonify({
+        'daily': _trend_of(daily_seq, 5),       # last 5 daily candles
+        'h4':    _trend_of(h4_seq, 6),           # last 6 four-hour candles (~1 day)
+        'h1':    _trend_of(h1_seq, 8),           # last 8 one-hour candles
+        'daily_last': pdays[-1] if pdays else '', 'h4_last': h4_last, 'h1_last': h1_last,
+        'h1_stale': bool(h1_last and h1_last < today_str),   # sheet's 1H tab lagging?
+        'h4_stale': bool(h4_last and h4_last < today_str),
+    })
+
 @app.route('/api/telegram-test')
 def telegram_test():
     """Send a test Telegram message — visit /api/telegram-test to check your setup."""

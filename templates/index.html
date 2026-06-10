@@ -593,6 +593,12 @@ input,select,textarea{font-family:inherit}
       <!-- Live Trade Bias / Flip indicator (two-stage) -->
       <div class="card mb-20" id="flip-box" style="display:none"></div>
 
+      <!-- Multi-Timeframe Trend (daily / 4H / 1H) -->
+      <div class="card mb-20">
+        <div class="card-header"><span class="card-title">📊 Multi-Timeframe Trend</span><span class="text3 fs-11" id="trends-note"></span></div>
+        <div class="grid-3" style="gap:12px" id="trends-grid"><span class="text3">Loading…</span></div>
+      </div>
+
       <!-- OHLC Levels: Last Close + Today (live) -->
       <div class="card mb-20">
         <div class="card-header"><span class="card-title">Price Levels — Last Close &amp; Today (live)</span></div>
@@ -1038,6 +1044,7 @@ async function fetchLive() {
     if (typeof priceCheck === 'function') priceCheck();
     if (typeof reactionMap === 'function') reactionMap();
     if (typeof flipBias === 'function') flipBias();
+    if (typeof loadTrends === 'function') loadTrends();
     const price = '$' + Number(d.price).toLocaleString('en',{minimumFractionDigits:2,maximumFractionDigits:2});
     const up    = d.change >= 0;
     const chg   = `${up?'+':''}${fmtN(d.change)} (${up?'+':''}${d.change_pct}%)`;
@@ -1075,6 +1082,27 @@ S.liveInterval = setInterval(fetchLive, 30000);
 
 // ── PRICE CHECK — type any price, get buy/don't-buy + SL/TP for today ───────────
 function pcUseLive(){ if(window.LIVEPRICE){ document.getElementById('pc-input').value = window.LIVEPRICE; priceCheck(); } }
+// ── MULTI-TIMEFRAME TREND (daily / 4H / 1H) ─────────────────────────────────────
+async function loadTrends(){
+  const grid=document.getElementById('trends-grid'); if(!grid) return;
+  let t; try{ t=await fetch('/api/trends').then(r=>r.json()); }catch(e){ return; }
+  const cell=(label, tr, stale)=>{
+    if(!tr) return `<div style="background:var(--card2);border:1px solid var(--border);border-radius:10px;padding:12px"><div class="text3 fs-11">${label}</div><div class="text3">no data</div></div>`;
+    const up=tr.dir==='UP', down=tr.dir==='DOWN';
+    const c= up?'buy':down?'sell':'text2';
+    const arrow= up?'▲':down?'▼':'→';
+    const word= up?'UPTREND':down?'DOWNTREND':'FLAT / RANGE';
+    return `<div style="background:var(--card2);border:1px solid var(--border);border-left:4px solid var(--${up?'buy':down?'sell':'border2'});border-radius:10px;padding:12px">
+      <div class="text3 fs-11" style="text-transform:uppercase;letter-spacing:.5px">${label}${stale?' <span class="sell" style="font-size:9px">⚠ stale</span>':''}</div>
+      <div class="${c}" style="font-size:18px;font-weight:800;margin-top:2px">${arrow} ${word}</div>
+      <div class="text3 fs-11" style="margin-top:2px">net ${tr.net>=0?'+':'−'}$${fmtN(Math.abs(tr.net))} · ${tr.bull}/${tr.bars} candles up</div>
+    </div>`;
+  };
+  grid.innerHTML = cell('Daily', t.daily, t.daily_stale) + cell('4-Hour', t.h4, t.h4_stale) + cell('1-Hour', t.h1, t.h1_stale);
+  const note=document.getElementById('trends-note');
+  if(note) note.innerHTML = t.h1_stale ? ('1H data last '+t.h1_last+' (sheet H1 tab is behind)') : '';
+}
+
 // ── LIVE TRADE BIAS / FLIP (two-stage: weakening at PP, flip at the stop) ────────
 function flipBias(){
   const el=document.getElementById('flip-box'); if(!el) return;
@@ -1747,9 +1775,9 @@ async function openDetail(dateStr) {
         <div class="dp-row"><span class="dr-label">Action</span><span class="dr-val ${pl.dir==='BUY'?'buy':'sell'}">${pl.dir==='BUY'?'▲ BUY':'▼ SELL'} — trend continuation</span></div>
         <div class="dp-row"><span class="dr-label">Entry zone (${pl.dir==='SELL'?'high +$8–10':'low −$8–10'})</span><span class="dr-val gold">${pl.zone_low!=null?fmt(pl.zone_low)+' – '+fmt(pl.zone_high):'—'}</span></div>
         <div class="dp-row"><span class="dr-label">Filled</span><span class="dr-val">${pl.filled?('✓ entered'+(pl.fill_time?' ('+pl.fill_time+')':'')):'not triggered yet'}</span></div>
-        <div class="dp-row"><span class="dr-label">Take-profit (${pl.target_ref})</span><span class="dr-val buy">${pl.target!=null?fmt(pl.target):'—'}</span></div>
-        <div class="dp-row"><span class="dr-label">Stop-loss (${pl.stop_ref})</span><span class="dr-val sell">${pl.stop!=null?fmt(pl.stop):'—'}</span></div>
-        <div class="dp-row"><span class="dr-label">Move size</span><span class="dr-val">$${fmtN(pl.move)} <span class="text3 fs-11">(recent range $${fmtN(pl.move_recent)} + ${pl.dir==='BUY'?'sign':'sign'}+stage $${fmtN(pl.move_signstage)})/2</span></span></div>
+        <div class="dp-row"><span class="dr-label">Take-profit${pl.target_ref?' ('+pl.target_ref+')':''}</span><span class="dr-val buy">${pl.target!=null?fmt(pl.target):'—'}</span></div>
+        <div class="dp-row"><span class="dr-label">Move stop to breakeven at</span><span class="dr-val">${pl.be!=null?fmt(pl.be):'—'}</span></div>
+        <div class="dp-row"><span class="dr-label">Stop-loss${pl.stop_ref?' ('+pl.stop_ref+')':''}</span><span class="dr-val sell">${pl.stop!=null?fmt(pl.stop):'—'}</span></div>
       ` : `
         <div class="dp-row"><span class="dr-label">Action</span><span class="dr-val ${pl.dir==='BUY'?'buy':'sell'}">${pl.dir==='BUY'?'▲ BUY':'▼ SELL'} at the pivot</span></div>
         <div class="dp-row"><span class="dr-label">Entry — ${pl.entry_label||'pivot point'}</span><span class="dr-val gold">${fmt(pl.entry)}</span></div>
