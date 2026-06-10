@@ -5,6 +5,7 @@ import json
 from datetime import datetime, timedelta
 from calendar import monthrange
 import os
+import pytz
 import requests as req
 import engine
 import news
@@ -14,6 +15,39 @@ import trade_journal as tj
 
 app = Flask(__name__)
 import re, urllib.parse
+
+# ── TRADING DAY: gold's daily candle rolls at 5pm New York (NOT UTC midnight) ────
+_NY_TZ = pytz.timezone('America/New_York')
+_DXB_TZ = pytz.timezone('Asia/Dubai')
+
+def _session_date(ny):
+    """Trading-session date for an America/New_York-aware datetime:
+       the NY calendar date, +1 day if the NY local time is 17:00 or later
+       (the 5pm-NY roll). DST is handled by the aware datetime."""
+    return ny.date() + (timedelta(days=1) if ny.hour >= 17 else timedelta(0))
+
+def _trading_dt():
+    """Current gold trading-session date as a naive datetime at that date's midnight —
+       safe for .strftime and +/- timedelta. Replaces _trading_dt() everywhere
+       'the current session' is meant, so local and Render (UTC) behave identically."""
+    d = _session_date(datetime.now(_NY_TZ))
+    return datetime(d.year, d.month, d.day)
+
+def _trading_day():
+    """Current trading-session date as 'YYYY-MM-DD'."""
+    return _trading_dt().strftime('%Y-%m-%d')
+
+def _session_meta():
+    """Human 'as of' info for the dashboard so the user knows the plan on screen is the
+       CURRENT trading session's (cross-platform date formatting — no %-d/%-I)."""
+    tday = _trading_dt(); prev = tday - timedelta(days=1)
+    md = lambda d: d.strftime('%b ') + str(d.day)          # "Jun 11"
+    wmd = lambda d: d.strftime('%a %b ') + str(d.day)      # "Thu Jun 11"
+    now_dxb = datetime.now(_DXB_TZ); now_ny = datetime.now(_NY_TZ)
+    asof = now_dxb.strftime('%I:%M %p').lstrip('0')
+    return {'trading_day': tday.strftime('%Y-%m-%d'),
+            'label': 'Plan for trading day %s (session 5pm-NY %s → 5pm-NY %s)' % (wmd(tday), md(prev), md(tday)),
+            'as_of': 'refreshed %s Dubai · %s NY' % (asof, now_ny.strftime('%I:%M %p').lstrip('0'))}
 
 # ── DATA SOURCE: live Google Sheet (spot OHLC, auto-updating) ──────────────────
 SHEET_ID    = '12ynlr46bvHSJLnLGs5Z1SrhhlCj6_w7qO6YHMDBY7gs'
@@ -1244,7 +1278,7 @@ def _decision_advice(direction, entry, zlo, zhi, stop, tgt, dc, filled, fill_tim
             % (trend, base, zone))
 
 def build_day(date_str):
-    today = datetime.today().strftime('%Y-%m-%d')
+    today = _trading_day()
     m = DATA['moon'].get(date_str)
     p = DATA['prices'].get(date_str)
     day = {'date': date_str, 'is_past': date_str < today, 'is_today': date_str == today}
@@ -1594,7 +1628,7 @@ def live_price():
         g = req.get('https://api.gold-api.com/price/XAU', timeout=8).json()
         current = float(g.get('price') or 0)
 
-        today_str = datetime.today().strftime('%Y-%m-%d')
+        today_str = _trading_day()
         closed = market_closed_reason(today_str, today_str)   # weekend / holiday now?
 
         # Last close (most recent trading day) from the sheet — spot OHLC + midpoint
@@ -1626,7 +1660,7 @@ def live_price():
         chg_pct = round(change / float(prev) * 100, 2) if prev else 0
 
         # Today's running O/H/L from H1 candles (+ fold in the live price)
-        today  = datetime.today().strftime('%Y-%m-%d')
+        today  = _trading_day()
         closed = market_closed_reason(today, today)        # weekend / holiday → no running OHLC
         todays = [] if closed else [c for c in DATA.get('h1', []) if str(c.get('dt', '')).startswith(today)]
         if not todays and not closed:
@@ -1746,7 +1780,7 @@ def price_history(days):
 def forecast(days):
     # Kept for backward-compat: pure future window of N days
     from datetime import timedelta
-    today = datetime.today()
+    today = _trading_dt()
     result = []
     for i in range(days):
         d = (today + timedelta(days=i)).strftime('%Y-%m-%d')
@@ -1760,7 +1794,7 @@ def forecast(days):
 def forecast_range(past=20, future=30):
     """Combined window: last `past` days + next `future` days (default 20 + 30)."""
     from datetime import timedelta
-    today = datetime.today()
+    today = _trading_dt()
     result = []
     for i in range(-past, future + 1):
         d = (today + timedelta(days=i)).strftime('%Y-%m-%d')
@@ -1807,7 +1841,7 @@ def analysis():
 # ── STATS (overall + monthly) ─────────────────────────────────────────────────
 @app.route('/api/stats')
 def stats():
-    today = datetime.today().strftime('%Y-%m-%d')
+    today = _trading_day()
     monthly = {}
     total_correct = total_signals = total_bull = total_bear = 0
     total_be = total_loss = 0
@@ -1916,7 +1950,7 @@ def _reversal_state(daily, h4, h1):
 @app.route('/api/trends')
 def trends():
     """Trend direction on three timeframes: daily / 4-hour / 1-hour + reversal watch."""
-    today_str = datetime.today().strftime('%Y-%m-%d')
+    today_str = _trading_day()
     pdays = sorted(DATA['prices'])
     daily_seq = [(DATA['prices'][d].get('close'), DATA['prices'][d].get('open')) for d in pdays]
     h4 = sorted(DATA.get('h4', []), key=_cdt)   # chronological, not string (non-padded hours)
@@ -1952,7 +1986,7 @@ def _recent_alert_entries(n=20):
     """Last n trading-day alert entries (most-recent first) — derived from the engine,
        so the log is always complete and survives redeploys (no storage needed to view)."""
     from datetime import timedelta
-    out = []; i = 0; d0 = datetime.today()
+    out = []; i = 0; d0 = _trading_dt()
     while len(out) < n and i < 120:
         ds = (d0 - timedelta(days=i)).strftime('%Y-%m-%d'); i += 1
         day = build_day(ds)
@@ -2037,7 +2071,7 @@ def _restore_journal_from_sheet():
 def _record_today_journal():
     """Record TODAY's FINAL signal once, BEFORE the day closes (so it can't be back-filled).
        Records WAIT when the wait-for-4H safeguard is active."""
-    today = datetime.today().strftime('%Y-%m-%d')
+    today = _trading_day()
     bar = DATA['prices'].get(today)
     if bar and bar.get('close') is not None:
         return                              # day already closed — too late for an honest call
@@ -2071,7 +2105,7 @@ def _norm_candles(cands):
 def _place_today_trade():
     """Place TODAY's WITH-TREND setup once (entry/stop/target from the 4H plan).
        Skips counter-trend and non-directional/WAIT days. place() dedups by dir+entry."""
-    today = datetime.today().strftime('%Y-%m-%d')
+    today = _trading_day()
     day = build_day(today)
     if day.get('market_closed') or day.get('mtf_with_trend') is not True:
         return
@@ -2164,6 +2198,51 @@ def _restore_trades_from_sheet():
 def api_track_record():
     return jsonify(tj.stats())
 
+def _do_roll():
+    """One call that makes the NEW trading day's plan live: reload the sheet (to pick up
+       the prior session's final close), record the journal prediction, grade what closed,
+       place the with-trend trade setup, and drive the engine. Idempotent — the journal
+       and trade placements dedup, so hitting it twice changes nothing."""
+    load_data_safe()
+    _record_today_journal()
+    if journal.grade_pending(DATA['prices']):
+        _mirror_journal()
+    _place_today_trade()
+    _process_trade_engine()
+    td = _trading_day()
+    day = build_day(td)
+    pl = day.get('plan4h') or {}
+    return {'trading_day': td, 'signal': day.get('signal'), 'mtf_label': day.get('mtf_label'),
+            'wait_4h': day.get('wait_4h'),
+            'entry': pl.get('entry'), 'stop': pl.get('stop'), 'target': pl.get('target')}
+
+@app.route('/api/roll')
+def api_roll():
+    """Hit at the 5pm-NY session roll (by the scheduler / an external keep-warm ping) to
+       make the new day's plan live within the first hour. Safe to call anytime."""
+    try:
+        return jsonify({'ok': True, **_do_roll()})
+    except Exception as e:
+        return jsonify({'ok': False, 'error': str(e)}), 500
+
+def _roll_scheduler_loop():
+    """In-process cron: fire _do_roll daily at 17:05 America/New_York (auto-tracks DST,
+       so it's 1:05am Dubai in summer / 2:05am in winter). Needs the instance awake — keep
+       a lightweight external ping (UptimeRobot/cron) hitting the URL so it isn't asleep."""
+    import time as _t
+    while True:
+        now_ny = datetime.now(_NY_TZ)
+        target = now_ny.replace(hour=17, minute=5, second=0, microsecond=0)
+        if now_ny >= target:
+            target = target + timedelta(days=1)
+        sleep_s = max(60, (target - now_ny).total_seconds())
+        _t.sleep(sleep_s)
+        try:
+            r = _do_roll()
+            print('Session-roll recompute fired:', r.get('trading_day'), r.get('signal'))
+        except Exception as e:
+            print('Session-roll error:', e)
+
 # ── persist the daily alert log to the Google Sheet (ALERT_LOG tab) ──────────────
 ALERT_LOG_FILE = os.path.join(_HERE, 'alert_log.json')   # local fallback (ephemeral on Render)
 
@@ -2214,13 +2293,13 @@ def telegram_setup():
 @app.route('/api/dashboard')
 def dashboard():
     from datetime import timedelta
-    today_str = datetime.today().strftime('%Y-%m-%d')
+    today_str = _trading_day()
     today_day = build_day(today_str)
 
     # Last 5 completed TRADING days (skip weekends/holidays)
     recent = []
     for i in range(1, 12):
-        d = (datetime.today() - timedelta(days=i)).strftime('%Y-%m-%d')
+        d = (_trading_dt() - timedelta(days=i)).strftime('%Y-%m-%d')
         day = build_day(d)
         if day.get('close') and not day.get('market_closed'):
             recent.append(day)
@@ -2229,7 +2308,7 @@ def dashboard():
     # Next 7 TRADING days forecast (skip weekends/holidays)
     upcoming = []
     for i in range(1, 16):
-        d = (datetime.today() + timedelta(days=i)).strftime('%Y-%m-%d')
+        d = (_trading_dt() + timedelta(days=i)).strftime('%Y-%m-%d')
         day = build_day(d)
         if day.get('sign') and not day.get('market_closed'):
             upcoming.append(day)
@@ -2256,6 +2335,7 @@ def dashboard():
         'recent': recent,
         'upcoming': upcoming,
         'decision_alert': decision_alert,
+        'session': _session_meta(),
     })
 
 # ── TELEGRAM DECISION-DAY ALERT (end of day) ──────────────────────────────────
@@ -2303,7 +2383,7 @@ def check_decision_telegram(force=False):
     sent = _tg_sent_load()
     if not force and sent.get('last') == last:
         return False, 'already alerted for %s' % last
-    today = datetime.today().strftime('%Y-%m-%d')
+    today = _trading_day()
     nd = _first_trading_day_after(last, today)
     msg = _decision_telegram_message(build_day(last), build_day(nd) if nd else None)
     ok, info = notify.send(msg)
@@ -2334,7 +2414,7 @@ def check_setup_telegram(force=False):
        entry/stop/target. Skips counter-trend signals (those are 'skip/wait')."""
     if not notify.configured():
         return False, 'telegram not configured'
-    today = datetime.today().strftime('%Y-%m-%d')
+    today = _trading_day()
     day = build_day(today)
     if day.get('market_closed'):
         return False, 'market closed'
@@ -2415,6 +2495,7 @@ def init_app():
     news.load_cache()
     threading.Thread(target=_startup_news_refresh, daemon=True).start()
     threading.Thread(target=_auto_refresh_loop, daemon=True).start()
+    threading.Thread(target=_roll_scheduler_loop, daemon=True).start()   # 5pm-NY session roll
     try:
         check_decision_telegram()      # fire on startup too, if today's close already qualifies
         check_setup_telegram()         # ...and today's with-trend trade setup

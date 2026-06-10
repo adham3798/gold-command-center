@@ -575,6 +575,12 @@ input,select,textarea{font-family:inherit}
 
     <!-- ═══════ PAGE: DASHBOARD ═══════ -->
     <div class="page active" id="page-dashboard">
+      <!-- Session "as of" bar -->
+      <div id="session-bar" style="display:none;margin-bottom:14px;padding:8px 12px;border-radius:8px;background:var(--card);border:1px solid var(--border);font-size:12px">
+        <span class="text2" id="session-label" style="font-weight:700"></span>
+        <span class="text3" id="session-asof" style="margin-left:8px"></span>
+      </div>
+
       <!-- Today's Action — plain-language what-to-do, top of dashboard -->
       <div class="card mb-20" id="action-card" style="display:none"></div>
 
@@ -1556,6 +1562,14 @@ async function loadDashboard(_attempt) {
     fetch('/api/levels').then(r => r.json()),
     fetch('/api/live-price').then(r => r.json()),
   ]);
+
+  // Session "as of" bar — tells the user the plan on screen is the current session's
+  if (dash.session) {
+    const sb=document.getElementById('session-bar');
+    if(sb){ sb.style.display='block';
+      document.getElementById('session-label').textContent='📅 '+dash.session.label;
+      document.getElementById('session-asof').textContent='· '+dash.session.as_of; }
+  }
 
   // Today signal card
   const t = dash.today;
