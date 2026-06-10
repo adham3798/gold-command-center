@@ -1870,6 +1870,66 @@ def trends():
         'h4_stale': bool(h4_last and h4_last < today_str),
     })
 
+def _alert_entry(day):
+    """One daily-alert row from a built day, or None if no directional signal."""
+    pl = day.get('plan4h') or {}
+    dirn = 'BUY' if 'BUY' in (day.get('signal') or '') else ('SELL' if 'SELL' in (day.get('signal') or '') else None)
+    if not dirn:
+        return None
+    entry = ('%.2f-%.2f' % (pl['zone_low'], pl['zone_high'])) if pl.get('zone_low') is not None else (
+            round(pl['entry'], 2) if pl.get('entry') is not None else None)
+    return {'date': day['date'], 'dir': dirn, 'signal': day.get('signal'),
+            'with_trend': day.get('mtf_with_trend'), 'label': day.get('mtf_label'),
+            'regime': day.get('trend_regime'), 'entry': entry,
+            'stop': pl.get('stop'), 'target': pl.get('target'), 'outcome': pl.get('outcome')}
+
+def _recent_alert_entries(n=20):
+    """Last n trading-day alert entries (most-recent first) — derived from the engine,
+       so the log is always complete and survives redeploys (no storage needed to view)."""
+    from datetime import timedelta
+    out = []; i = 0; d0 = datetime.today()
+    while len(out) < n and i < 120:
+        ds = (d0 - timedelta(days=i)).strftime('%Y-%m-%d'); i += 1
+        day = build_day(ds)
+        if day.get('market_closed'):
+            continue
+        e = _alert_entry(day)
+        if e:
+            out.append(e)
+    return out
+
+@app.route('/api/alerts')
+@app.route('/api/alerts/<int:n>')
+def alerts(n=20):
+    return jsonify(_recent_alert_entries(n))
+
+# ── persist the daily alert log to the Google Sheet (ALERT_LOG tab) ──────────────
+ALERT_LOG_FILE = os.path.join(_HERE, 'alert_log.json')   # local fallback (ephemeral on Render)
+
+def _log_alerts():
+    """Upsert the last few days' alert entries into durable storage: POST to the sheet's
+       Apps Script webhook (ALERT_WEBHOOK_URL) if set, else a local JSON file."""
+    entries = _recent_alert_entries(7)
+    url = os.environ.get('ALERT_WEBHOOK_URL')
+    if url:
+        try:
+            r = req.post(url, json={'rows': entries}, timeout=15)
+            print('Alert log -> sheet ALERT_LOG:', r.status_code)
+        except Exception as e:
+            print('Alert log webhook failed:', e)
+        return
+    try:                                          # local fallback (upsert by date)
+        existing = {}
+        if os.path.exists(ALERT_LOG_FILE):
+            with open(ALERT_LOG_FILE, encoding='utf-8') as f:
+                existing = {r['date']: r for r in json.load(f)}
+        for e in entries:
+            existing[e['date']] = e
+        with open(ALERT_LOG_FILE, 'w', encoding='utf-8') as f:
+            json.dump(sorted(existing.values(), key=lambda r: r['date'], reverse=True), f)
+    except Exception as e:
+        print('Alert log JSON failed:', e)
+
 @app.route('/api/telegram-test')
 def telegram_test():
     """Send a test Telegram message — visit /api/telegram-test to check your setup."""
@@ -2054,6 +2114,10 @@ def _auto_refresh_loop(interval=300):
             check_setup_telegram()
         except Exception as e:
             print("Setup Telegram check error:", e)
+        try:
+            _log_alerts()
+        except Exception as e:
+            print("Alert-log error:", e)
 
 def _startup_news_refresh():
     try:
@@ -2079,6 +2143,7 @@ def init_app():
     try:
         check_decision_telegram()      # fire on startup too, if today's close already qualifies
         check_setup_telegram()         # ...and today's with-trend trade setup
+        _log_alerts()                  # ...and persist today's alert-log row
     except Exception as e:
         print("Startup Telegram check skipped:", e)
 
