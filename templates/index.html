@@ -294,7 +294,8 @@ input,select,textarea{font-family:inherit}
 }
 .cal-day:nth-child(7n){border-right:none}
 .cal-day:hover{background:var(--card2)}
-.cal-day.empty{background:transparent;cursor:default}
+.cal-day.empty{background:repeating-linear-gradient(45deg,transparent,transparent 6px,var(--border) 6px,var(--border) 7px);opacity:.4;cursor:default}
+.cal-day.empty:hover{background:repeating-linear-gradient(45deg,transparent,transparent 6px,var(--border) 6px,var(--border) 7px)}
 .cal-day.today .cal-day-num{
   background:var(--gold);color:#000;border-radius:50%;
   width:22px;height:22px;display:flex;align-items:center;justify-content:center;
@@ -1866,15 +1867,21 @@ async function loadCalendar() {
   document.getElementById('cal-days').innerHTML = '<div style="grid-column:1/-1" class="loading-spinner"><div class="spinner"></div></div>';
   const data = await fetch(`/api/calendar/${S.calYear}/${S.calMonth}`).then(r => r.json());
 
-  const firstDay = new Date(S.calYear, S.calMonth-1, 1).getDay();
+  // ONE explicit basis for BOTH the grid and the highlight: the local CALENDAR date.
+  // (The 5pm-NY trading day is for signals, not the wall-clock calendar — using it here
+  //  could shift the "today" cell by a day in the hour around the roll.)
+  const firstDay = new Date(S.calYear, S.calMonth-1, 1).getDay();   // 0=Sun … matches the Sun-first header
+  const now = new Date();
+  const todayStr = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}`;
   let html = '';
   for (let i=0; i<firstDay; i++) html += '<div class="cal-day empty"></div>';
   data.forEach(d => {
     const sig = d.signal || 'NO DATA';
+    const isToday = d.date === todayStr;
     const cls = [
       'cal-day',
-      d.is_today ? 'today' : '',
-      d.is_past  ? 'past'  : '',
+      isToday ? 'today' : '',
+      (!isToday && d.is_past) ? 'past' : '',
       d.outcome === 'W' ? 'correct-yes' : '',
       d.outcome === 'L' ? 'correct-no'  : '',
     ].filter(Boolean).join(' ');
