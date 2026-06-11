@@ -2,11 +2,17 @@
 """
 trade_journal.py (v2) — Trade engine + journal for gold-command-center.
 
-THE TWO RULES
-1. DIRECTION & ENTRY are judged ONLY on the 4-HOUR CLOSE.
-2. STOP-LOSS & TAKE-PROFIT fire IMMEDIATELY ON TOUCH (intrabar).
-Slow brain (4H close) decides WHEN YOU'RE IN; fast reflexes (touch) decide WHEN YOU'RE OUT.
+THE RULES
+1. ENTRY is a LIMIT at the planned PIVOT. A 4H candle that TOUCHES the pivot fills the
+   trade AT the pivot price (so the stop/target stay consistent with the level they were
+   sized from). If a candle gaps past the pivot, the fill is the gap open. The DIRECTION
+   still comes from the daily signal.
+2. STOP-LOSS & TAKE-PROFIT fire IMMEDIATELY ON TOUCH (intrabar) on the H1 feed.
 Optional trend-break exit: close at the 4H close after N consecutive 4H candles close against (default 3).
+
+NOTE: a prior version confirmed entry on the 4H CLOSE — out-of-sample that filled ~$28 past
+the pivot (70% of risk), turning 37% of target-hits into losses (PF 0.71). The limit-at-pivot
+entry fixes that mismatch (walk-forward PF ~2.7, ROBUST). See WALK_FORWARD_REPORT.md.
 """
 
 import json
@@ -85,10 +91,16 @@ def cancel(tid):
     return True
 
 
-def _confirm_entry(t, close):
-    if t['direction'] == 'BUY':
-        return close >= t['entry']
-    return close <= t['entry']
+def _limit_fill(t, o, h, l):
+    """LIMIT entry at the pivot. A candle that TOUCHES the entry (its range straddles it)
+       fills the trade AT the pivot price; if the candle OPENED past the pivot (a gap),
+       the fill is the gap open. Returns the fill price, or None if not touched yet."""
+    e = t['entry']
+    if l <= e <= h:
+        if t['direction'] == 'BUY':
+            return o if o < e else e
+        return o if o > e else e
+    return None
 
 
 def _close_trade(t, dt, price, reason):
@@ -142,12 +154,13 @@ def process_candles(timeframe, candles):
                 if timeframe != CONFIRM_TF:
                     continue
                 t['h4_pending'] += 1
-                if _confirm_entry(t, close):
+                fp = _limit_fill(t, o, h, l)
+                if fp is not None:
                     t['status'] = 'OPEN'
-                    t['fill'] = {'dt': dt, 'price': close,
-                                 'slip_vs_plan': round(abs(close - t['entry']), 2)}
-                    t['events'].append({'t': _now(), 'ev': 'filled_on_4h_close',
-                                        'dt': dt, 'price': close})
+                    t['fill'] = {'dt': dt, 'price': fp,
+                                 'slip_vs_plan': round(abs(fp - t['entry']), 2)}
+                    t['events'].append({'t': _now(), 'ev': 'filled_limit_at_pivot',
+                                        'dt': dt, 'price': fp})
                     changes += 1
                 elif t['h4_pending'] >= ENTRY_EXPIRY_4H:
                     t['status'] = 'CANCELLED'
@@ -229,37 +242,57 @@ if __name__ == '__main__':
     def C(dt, o, h, l, c):
         return {'dt': dt, 'open': o, 'high': h, 'low': l, 'close': c}
 
+    # BUY: pivot 100, stop 95, take 110
     tid = place('BUY', 100, 95, 110, source='test')
     assert tid
+    # 1H candle does NOT fill entry (entry is judged on 4H only)
     process_candles('1h', [C('2026-06-10 01:00', 99, 103, 98, 102)])
-    assert _load()['trades'][tid]['status'] == 'PENDING', '1H must not confirm entry'
-    process_candles('4h', [C('2026-06-10 04:00', 98, 104, 97, 99.0)])
-    assert _load()['trades'][tid]['status'] == 'PENDING', '4H wick-up close-down must not fill'
-    process_candles('4h', [C('2026-06-10 08:00', 99, 102, 98.5, 101.2)])
+    assert _load()['trades'][tid]['status'] == 'PENDING', '1H must not fill entry'
+    # 4H candle that never reaches the pivot (stays above 100) -> no fill
+    process_candles('4h', [C('2026-06-10 04:00', 103, 105, 101, 104)])
+    assert _load()['trades'][tid]['status'] == 'PENDING', '4H that never touches the pivot must not fill'
+    # 4H candle dips to TOUCH the pivot (opens above, low<=100) -> LIMIT fills AT 100 (not the close)
+    process_candles('4h', [C('2026-06-10 08:00', 102, 103, 99, 101.0)])
     t = _load()['trades'][tid]
-    assert t['status'] == 'OPEN' and t['fill']['price'] == 101.2
+    assert t['status'] == 'OPEN' and t['fill']['price'] == 100, 'limit fills at the pivot'
+    # 1H touches the take (110) -> exit at 110, pnl from the pivot fill (100)
     process_candles('1h', [C('2026-06-10 09:00', 101, 110.4, 100.8, 108.0)])
     t = _load()['trades'][tid]
     assert t['status'] == 'CLOSED' and t['exit']['reason'] == 'take_touch'
-    assert t['exit']['price'] == 110 and abs(t['exit']['pnl'] - (110 - 101.2 - 0.5)) < 1e-9
+    assert t['exit']['price'] == 110 and abs(t['exit']['pnl'] - (110 - 100 - 0.5)) < 1e-9
+
+    # GAP entry: BUY pivot 100, a 4H candle OPENS below the pivot -> fill at the gap open (97)
+    tg = place('BUY', 100, 90, 120)
+    process_candles('4h', [C('2026-06-10 12:00', 97, 101, 96, 98)])      # opens 97 below pivot
+    assert _load()['trades'][tg]['fill']['price'] == 97, 'gap-through fills at the open'
+    process_candles('1h', [C('2026-06-10 13:00', 100, 121, 99, 118)])    # take 120 touched -> close
+    assert _load()['trades'][tg]['status'] == 'CLOSED'
+
+    # SELL: pivot 100, stop 105, take 90 — 4H touches 100 -> fill 100; 1H hits the stop (105)
     tid2 = place('SELL', 100, 105, 90)
-    process_candles('4h', [C('2026-06-10 12:00', 101, 102, 98, 99.5)])
-    process_candles('1h', [C('2026-06-10 13:00', 99.5, 105.3, 99, 100)])
+    process_candles('4h', [C('2026-06-10 16:00', 98, 102, 97, 99.5)])    # touches 100 -> fill 100
+    assert _load()['trades'][tid2]['fill']['price'] == 100
+    process_candles('1h', [C('2026-06-10 17:00', 99.5, 105.3, 99, 100)])  # high touches 105
     t2 = _load()['trades'][tid2]
-    assert t2['status'] == 'CLOSED' and t2['exit']['reason'] == 'stop_touch'
-    assert t2['exit']['price'] == 105
+    assert t2['status'] == 'CLOSED' and t2['exit']['reason'] == 'stop_touch' and t2['exit']['price'] == 105
+
+    # trend-break: BUY fills at 100, then 3 bearish 4H closes (never hitting the 90 stop) -> out
     tid3 = place('BUY', 100, 90, 120, exit_on_4h_against=3)
-    process_candles('4h', [C('2026-06-10 16:00', 99, 101, 98, 100.5)])
-    process_candles('4h', [C('2026-06-10 20:00', 100.5, 101, 99, 99.8),
-                           C('2026-06-11 00:00', 99.8, 100.2, 98.5, 99.0),
-                           C('2026-06-11 04:00', 99.0, 99.5, 97.8, 98.2)])
+    process_candles('4h', [C('2026-06-10 20:00', 101, 102, 99, 100.5)])  # touch -> fill 100
+    process_candles('4h', [C('2026-06-11 00:00', 100.5, 101, 99.5, 99.8),
+                           C('2026-06-11 04:00', 99.8, 100.2, 98.5, 99.0),
+                           C('2026-06-11 08:00', 99.0, 99.5, 97.8, 98.2)])
     t3 = _load()['trades'][tid3]
     assert t3['status'] == 'CLOSED' and t3['exit']['reason'] == 'trend_break_4h', t3['exit']
+
+    # stop-vs-take same candle: fill 100, then one candle touches BOTH -> stop wins (pessimistic)
     tid4 = place('BUY', 100, 95, 110)
-    process_candles('4h', [C('2026-06-11 08:00', 99, 101, 98, 100.8)])
-    process_candles('1h', [C('2026-06-11 09:00', 100.8, 110.5, 94.5, 100)])
+    process_candles('4h', [C('2026-06-11 12:00', 102, 103, 99, 100.8)])  # touch -> fill 100
+    process_candles('1h', [C('2026-06-11 13:00', 100.8, 110.5, 94.5, 100)])
     t4 = _load()['trades'][tid4]
     assert t4['exit']['reason'] == 'stop_touch', 'ambiguous candle must take the stop'
+
     s = stats()
-    assert s['closed'] == 4
-    print('trade_journal.py v2 self-test OK — exit reasons:', s['exit_reasons'])
+    assert s['closed'] == 5, s['closed']    # tid, tg, tid2, tid3, tid4
+    assert s['avg_entry_slippage'] is not None
+    print('trade_journal.py self-test OK (limit-at-pivot) — exit reasons:', s['exit_reasons'])

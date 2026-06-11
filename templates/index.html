@@ -1174,7 +1174,7 @@ async function renderTradeRecord(){
   const reasonChips=[['take_touch','TP',(rx.take_touch||0)+(rx.take_gap||0)],['stop_touch','SL',(rx.stop_touch||0)+(rx.stop_gap||0)],['trend_break_4h','trend-break',rx.trend_break_4h||0],['expiry','3-day stop',rx.expiry||0]]
     .map(([k,lbl,v])=>`<span class="text3 fs-11" style="margin-right:10px">${lbl}: <b class="text2">${v}</b></span>`).join('');
   const openRows=(s.open||[]).map(o=>`<div class="text3 fs-11">● OPEN ${o.dir} @ ${fmt(o.fill&&o.fill.price)} · SL ${fmt(o.stop)} · TP ${fmt(o.take)}${o.h4_against_run?` · ${o.h4_against_run} 4H against`:''}</div>`).join('');
-  const pendRows=(s.pending||[]).map(p=>`<div class="text3 fs-11">○ PENDING ${p.dir} entry ${fmt(p.entry)} · waited ${p.h4_waited} 4H close${p.h4_waited===1?'':'s'}</div>`).join('');
+  const pendRows=(s.pending||[]).map(p=>`<div class="text3 fs-11">○ PENDING ${p.dir} · limit at pivot ${fmt(p.entry)} · ${p.h4_waited} 4H bar${p.h4_waited===1?'':'s'} waiting for the touch</div>`).join('');
   el.style.display='block'; el.style.borderLeft='4px solid '+col;
   el.innerHTML = `<div class="card-header"><span class="card-title">📈 Live Track Record <span class="text3 fs-11">· real trade rules</span></span>`
     + `<span class="${bcls} fs-11" style="font-weight:800">${badge}</span></div>`
@@ -1188,7 +1188,7 @@ async function renderTradeRecord(){
     + `<div class="text3 fs-11" style="margin-bottom:8px">avg ${s.avg_r==null?'—':(s.avg_r>=0?'+':'')+s.avg_r+'R'} · expectancy ${s.expectancy_usd==null?'—':'$'+s.expectancy_usd}/trade · avg entry slippage ${s.avg_entry_slippage==null?'—':'$'+s.avg_entry_slippage}</div>`
     + `<div style="margin-bottom:8px">${reasonChips}</div>`
     + (openRows||pendRows ? `<div style="border-top:1px solid var(--border);padding-top:8px">${openRows}${pendRows}</div>` : '')
-    + `<div class="text3 fs-11" style="margin-top:6px">Entries confirm on a 4H close · stops/targets exit on touch (1H)</div>`;
+    + `<div class="text3 fs-11" style="margin-top:6px">Limit entry at the pivot (fills when a 4H candle touches it) · stops/targets exit on touch (1H)</div>`;
 }
 function confBar(conf, sig) {
   const cls = sigColor(sig);
