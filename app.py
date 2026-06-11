@@ -1706,52 +1706,111 @@ def _sign_character():
         }
     return _SIGN_CHAR
 
+# signs the user reads as a "pause" — measured range says otherwise, so phrase as expectation
+_PAUSE_EXPECTATION = {'Pisces'}
+
+def _regime_word(regime):
+    return {'UP': 'up-trend', 'DOWN': 'down-trend'}.get(regime, 'no clear trend')
+
+def _confirm_color(regime):
+    # the 4H close color that would CONFIRM a turn AGAINST the prevailing trend
+    return 'green' if regime == 'DOWN' else 'red' if regime == 'UP' else 'green-or-red'
+
 def _sign_story(s, c, regime):
-    """Plain-language description + regime interaction, grounded ONLY in the regime-split."""
+    """Per-sign character in plain language. Confident where the data supports it,
+       framed as an EXPECTATION-to-watch where it does not (e.g. the Pisces 'pause')."""
     if not c:
-        return None, None
-    big = c['avg_range'] >= 90 or abs(c['avg_chg']) >= 12
+        return '%s — no measured character.' % s
+    rng = 'wide' if c['avg_range'] >= 95 else 'tight' if c['avg_range'] <= 72 else 'average'
+    cont = ('continuation lower / fresh lows' if regime == 'DOWN'
+            else 'continuation higher' if regime == 'UP' else 'direction unclear until a trend forms')
     if c['read'] == 'AMPLIFIES':
-        base = 'tends to make %s moves that EXTEND the prevailing trend (validated both up & down)' % ('large' if big else 'directional')
-        interp = ('trend is DOWN → expect continuation lower / fresh lows' if regime == 'DOWN'
-                  else 'trend is UP → expect continuation higher' if regime == 'UP'
-                  else 'no clear trend yet → its push needs a trend to extend; wait for direction')
+        strength = ('validated both ways' if c['min_cell'] >= 12 else 'seen both ways but on a smaller sample')
+        lean = ' with a mild up-lean (%d%% up-days)' % c['pct_up'] if c['pct_up'] >= 60 else ''
+        with_w = ('With the down-trend' if regime == 'DOWN' else 'With the up-trend' if regime == 'UP' else 'With no clear trend')
+        txt = ('%s makes %s moves that EXTEND the prevailing trend%s — %s '
+               '(%+d/day avg in up-trends, %+d in down-trends). %s, expect %s, '
+               'though with sharp counter-pullbacks inside the move.'
+               % (s, 'big' if c['avg_range'] >= 80 else 'directional', lean, strength,
+                  c['up_avg'], c['dn_avg'], with_w, cont))
     elif c['read'] == 'BULLISH':
-        base = 'leans up-biased across both regimes in this sample (%d%% up-days)' % c['pct_up']
-        interp = ('favor longs / dip-buys' if regime != 'DOWN'
-                  else 'up-lean against a down trend — conflicting, low confidence; defer to the signal')
+        if s in _PAUSE_EXPECTATION:
+            txt = ('%s — you\'ll often look for a quiet pause/small pullback here, but historically its '
+                   'range is %s ($%d) and it actually leans mildly UP (%d%% up-days), so don\'t assume a '
+                   'pause — let price show it.' % (s, rng, c['avg_range'], c['pct_up']))
+        else:
+            txt = '%s leans modestly up-biased (%d%% up-days, %s range $%d).' % (s, c['pct_up'], rng, c['avg_range'])
     elif c['read'] == 'BEARISH':
-        base = 'leans down-biased across both regimes in this sample'
-        interp = 'favor the short side' if regime != 'UP' else 'down-lean against an up trend — conflicting, low confidence'
+        txt = '%s leans modestly down-biased in this sample (%s range $%d).' % (s, rng, c['avg_range'])
     else:
-        base = 'no reliable directional bias (mixed across regimes)'
-        interp = 'treat as neutral — follow the signal + 4H confirmation, no sign-based tilt'
-    return base, interp
+        txt = ('%s — no reliable directional bias (it flipped with the regime, small samples). '
+               'Treat as neutral and follow the trend + 4H.' % s)
+    return txt
 
 @app.route('/api/week-story')
 def api_week_story():
     char = _sign_character()
     regime = _daily_trend_asof(_trading_day())
+    regw = _regime_word(regime)
+    today = _trading_day()
     td = _trading_dt(); monday = td - timedelta(days=td.weekday())
+    P = DATA['prices']
+
+    beats = []
+    # 1) SETUP — what the last completed day did + the regime
+    completed = sorted(d for d in P if P[d].get('change') is not None and d <= today)
+    if completed:
+        last = completed[-1]; ch = P[last]['change'] or 0
+        lw = datetime.strptime(last, '%Y-%m-%d').strftime('%a %b %d')
+        beats.append({'type': 'setup',
+                      'text': 'The prevailing trend is a %s. The last completed day (%s) closed %s (%+d). Here is how the week\'s moon signs tend to behave — as CONTEXT, not signals.'
+                              % (regw, lw, 'bearish' if ch < 0 else 'bullish' if ch > 0 else 'flat', ch)})
+
+    # 2) per clean-sign segment (Mon–Fri), grouping consecutive same-sign days
+    daylist = []
+    for i in range(5):
+        d = monday + timedelta(days=i); ds = d.strftime('%Y-%m-%d')
+        daylist.append((ds, d, DATA['moon'].get(ds) or {}))
+    i = 0
+    while i < len(daylist):
+        s = daylist[i][2].get('sign')
+        j = i
+        while j + 1 < len(daylist) and daylist[j + 1][2].get('sign') == s:
+            j += 1
+        st, en = daylist[i][1], daylist[j][1]
+        rng = st.strftime('%a %b %d') if i == j else '%s–%s' % (st.strftime('%a %b %d'), en.strftime('%a %d'))
+        c = char.get(s) if s else None
+        is_today = any(daylist[k][0] == today for k in range(i, j + 1))
+        beats.append({'type': 'sign', 'sign': s, 'emoji': SIGN_EMOJI.get(s, ''), 'range_label': rng,
+                      'is_today': is_today, 'char': c, 'text': _sign_story(s, c, regime)})
+        # intraday ingress watch-points inside this segment
+        for k in range(i, j + 1):
+            ing = daylist[k][2].get('ingress')
+            if ing and ing.get('to') and ing['to'] != s:
+                wd = daylist[k][1].strftime('%a %b %d')
+                beats.append({'type': 'watch', 'emoji': SIGN_EMOJI.get(ing['to'], ''),
+                              'text': '%s ~%s — %s begins entering (source timezone unlabeled). Watch around the change for a possible turn, but it is only a WATCH until the 4H confirms.'
+                                      % (wd, ing['time'], ing['to'])})
+        i = j + 1
+
+    # 3) ACTION spine — the validated rule, the backbone of every day
+    beats.append({'type': 'action',
+                  'text': 'ACTION: a sign change or expected pullback is a WATCH, not a trade. Stay WITH the %s. Only call a reversal once a 4-hour candle CLOSES %s (green = up-turn, red = down-turn) — the same 4H confirmation the signal already requires. Until then, do not fight the trend.'
+                          % (regw, _confirm_color(regime))})
+
+    # also return the per-day rows (signs + stats) for the detail strip
+    days = []
     prev = (DATA['moon'].get((monday - timedelta(days=1)).strftime('%Y-%m-%d')) or {}).get('sign')
-    out = []
     for i in range(7):
         d = monday + timedelta(days=i); ds = d.strftime('%Y-%m-%d')
-        m = DATA['moon'].get(ds) or {}
-        s = m.get('sign'); c = char.get(s) if s else None
-        base, interp = _sign_story(s, c, regime)
-        out.append({
-            'date': ds, 'weekday': d.strftime('%a'),
-            'sign': s, 'sign_emoji': SIGN_EMOJI.get(s, ''),
-            'is_today': ds == _trading_day(),
-            'sign_change': bool(prev and s and s != prev),
-            'ingress': m.get('ingress'),
-            'char': c, 'narrative': base, 'interp': interp,
-            'market_closed': bool(market_closed_reason(ds, ds)),
-        })
+        m = DATA['moon'].get(ds) or {}; s = m.get('sign')
+        days.append({'date': ds, 'weekday': d.strftime('%a'), 'sign': s, 'sign_emoji': SIGN_EMOJI.get(s, ''),
+                     'is_today': ds == today, 'sign_change': bool(prev and s and s != prev),
+                     'ingress': m.get('ingress'), 'char': char.get(s) if s else None,
+                     'market_closed': bool(market_closed_reason(ds, ds))})
         if s:
             prev = s
-    return jsonify({'regime': regime, 'days': out})
+    return jsonify({'regime': regime, 'beats': beats, 'days': days})
 
 @app.route('/api/day/<date_str>')
 def api_day(date_str):
