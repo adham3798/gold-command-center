@@ -653,6 +653,7 @@ input,select,textarea{font-family:inherit}
             <div class="dp-row"><span class="dr-label">Open</span><span class="dr-val" id="td-o">—</span></div>
             <div class="dp-row"><span class="dr-label">High until now</span><span class="dr-val buy" id="td-h">—</span></div>
             <div class="dp-row"><span class="dr-label">Low until now</span><span class="dr-val sell" id="td-l">—</span></div>
+            <div class="text3" id="td-src" style="font-size:10px;margin-top:4px;line-height:1.4"></div>
           </div>
         </div>
       </div>
@@ -1270,6 +1271,10 @@ async function fetchLive() {
       ['td-o','td-h','td-l'].forEach(id => { const e=document.getElementById(id); if(e) e.innerHTML='<span class="text3" style="font-size:11px">closed</span>'; });
     } else {
       setT('td-o', d.today_open); setT('td-h', d.today_high); setT('td-l', d.today_low);
+      const src=document.getElementById('td-src');
+      if(src) src.textContent = d.today_src && d.today_src.indexOf('futures-only')>=0
+        ? '⚠ spot now; no spot intraday history (feed is COMEX futures). Set TWELVEDATA_KEY for true spot 1H.'
+        : (d.today_src ? 'spot — true session extremes' : '');
     }
   } catch(e) {}
 }

@@ -10,3 +10,4 @@ prediction_journal.json
 prediction_journal.json.tmp
 trade_journal.json
 trade_journal.json.tmp
+spot_session.json

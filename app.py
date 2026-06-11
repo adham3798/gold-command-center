@@ -49,6 +49,49 @@ def _session_meta():
             'label': 'Plan for trading day %s (session 5pm-NY %s → 5pm-NY %s)' % (wmd(tday), md(prev), md(tday)),
             'as_of': 'refreshed %s Dubai · %s NY' % (asof, now_ny.strftime('%I:%M %p').lstrip('0'))}
 
+def _session_start_utc():
+    """The current 5pm-NY session's start, as a naive UTC datetime (for filtering today's
+       intraday candles to the actual session window, not the UTC calendar date)."""
+    now_ny = datetime.now(_NY_TZ)
+    roll = now_ny.replace(hour=17, minute=0, second=0, microsecond=0)
+    if now_ny < roll:
+        roll = roll - timedelta(days=1)
+    return roll.astimezone(pytz.utc).replace(tzinfo=None)
+
+# Persisted SPOT session high/low — sampled from the live spot feed so today's extremes are
+# true SPOT (the Yahoo intraday fallback is COMEX futures, basis-offset from spot).
+def _spot_session_file():
+    return os.path.join(os.path.dirname(os.path.abspath(__file__)), 'spot_session.json')
+
+def _track_spot(price):
+    """Fold the current live SPOT price into the session high/low (reset at the 5pm-NY roll)."""
+    if not price:
+        return
+    td = _trading_day()
+    try:
+        with open(_spot_session_file(), encoding='utf-8') as f:
+            s = json.load(f)
+    except Exception:
+        s = {}
+    if s.get('day') != td or s.get('hi') is None:
+        s = {'day': td, 'hi': price, 'lo': price, 'open': price}
+    else:
+        s['hi'] = max(s['hi'], price); s['lo'] = min(s['lo'], price)
+    try:
+        with open(_spot_session_file(), 'w', encoding='utf-8') as f:
+            json.dump(s, f)
+    except Exception:
+        pass
+    return s
+
+def _spot_session():
+    try:
+        with open(_spot_session_file(), encoding='utf-8') as f:
+            s = json.load(f)
+        return s if s.get('day') == _trading_day() else None
+    except Exception:
+        return None
+
 # ── DATA SOURCE: live Google Sheet (spot OHLC, auto-updating) ──────────────────
 SHEET_ID    = '12ynlr46bvHSJLnLGs5Z1SrhhlCj6_w7qO6YHMDBY7gs'
 EXCEL_PATH  = r'C:\Users\PC-1\Downloads\gold price 1.xlsx'   # offline emergency fallback only
@@ -274,6 +317,8 @@ def load_data():
     # 1H gold candles from a live source and append the ones newer than the sheet's latest.
     # IMPORTANT: drop the currently-FORMING candle (Yahoo returns the in-progress bar as the
     # last element) so the trend updates only on a CLOSED hourly candle, not an intrabar tick.
+    # spot if a Twelve Data key is set (XAU/USD), else Yahoo GC=F COMEX FUTURES (basis-offset)
+    live_src = 'spot' if os.environ.get('TWELVEDATA_KEY') else 'futures'
     try:
         live = fetch_live_h1()
         if live:
@@ -281,11 +326,14 @@ def load_data():
             live = [c for c in live if _cdt(c) != datetime.min and _cdt(c) + timedelta(hours=1) <= now]
             latest = max((_cdt(c) for c in h1), default=datetime.min)
             fresh = [c for c in live if _cdt(c) > latest]
+            for c in fresh:
+                c['live_src'] = live_src            # tag so spot-only level math can exclude futures
             if fresh:
                 h1 = h1 + fresh
-                print("Live 1H: added %d fresh CLOSED candles (newest %s)" % (len(fresh), fresh[-1]['dt']))
+                print("Live 1H: added %d fresh CLOSED candles (%s, newest %s)" % (len(fresh), live_src, fresh[-1]['dt']))
     except Exception as e:
         print("Live 1H merge skipped:", e)
+    DATA['h1_live_src'] = live_src
 
     # sort both intraday series CHRONOLOGICALLY (not by string — non-padded hours scramble it)
     h1 = sorted(h1, key=_cdt)
@@ -1659,22 +1707,34 @@ def live_price():
         change  = round(current - float(prev), 2)
         chg_pct = round(change / float(prev) * 100, 2) if prev else 0
 
-        # Today's running O/H/L from H1 candles (+ fold in the live price)
+        # Today's running O/H/L — SPOT only, over the real 5pm-NY session window.
+        # The Yahoo intraday fallback is COMEX futures (basis-offset from spot), so those
+        # candles are EXCLUDED from the level math; we anchor to the live spot feed instead.
         today  = _trading_day()
         closed = market_closed_reason(today, today)        # weekend / holiday → no running OHLC
-        todays = [] if closed else [c for c in DATA.get('h1', []) if str(c.get('dt', '')).startswith(today)]
-        if not todays and not closed:
-            # sheet has no 1-hour data for today yet → use today's 4-hour candles
-            todays = [c for c in DATA.get('h4', []) if str(c.get('dt', '')).startswith(today)]
         t_open = t_high = t_low = None
-        if todays:
-            t_open = round(todays[0]['open'], 2)
-            highs = [c['high'] for c in todays if c.get('high') is not None]
-            lows  = [c['low']  for c in todays if c.get('low')  is not None]
-            t_high = round(max(highs), 2) if highs else None
-            t_low  = round(min(lows), 2) if lows else None
-            if t_high is not None and current and current > t_high: t_high = round(current, 2)
-            if t_low  is not None and current and current < t_low:  t_low  = round(current, 2)
+        today_src = None
+        if not closed:
+            _track_spot(current)                           # fold the live spot into session hi/lo
+            sess = _spot_session() or {}
+            win_start = _session_start_utc()
+            # spot candles only (sheet H1/H4); exclude the live futures-tagged candles
+            spot_cands = [c for c in DATA.get('h1', [])
+                          if c.get('live_src') != 'futures' and _cdt(c) != datetime.min
+                          and _cdt(c) >= win_start and c.get('high') is not None]
+            highs = [c['high'] for c in spot_cands]
+            lows  = [c['low']  for c in spot_cands]
+            if sess.get('hi') is not None:
+                highs.append(sess['hi']); lows.append(sess['lo'])
+            if current:
+                highs.append(current); lows.append(current)
+            if highs:
+                t_high = round(max(highs), 2); t_low = round(min(lows), 2)
+                t_open = round((spot_cands[0]['open'] if spot_cands else sess.get('open') or current), 2)
+                today_src = 'spot' if spot_cands else 'spot-live'   # spot-live = sampled live spot only
+            # If the only intraday we have is futures (sheet H1 lags + no spot key), say so
+            if DATA.get('h1_live_src') == 'futures' and not spot_cands:
+                today_src = 'spot-live (intraday history is futures-only — set TWELVEDATA_KEY for spot 1H)'
 
         time_str = '--'
         ua = str(g.get('updatedAt', ''))
@@ -1694,6 +1754,7 @@ def live_price():
             'today_open': t_open,
             'today_high': t_high,
             'today_low':  t_low,
+            'today_src':  today_src,
             'last_close': last_close,
             'source': 'gold-api.com (spot)',
         })
@@ -2450,6 +2511,11 @@ def _auto_refresh_loop(interval=300):
             news.refresh(timeout=15)
         except Exception as e:
             print("Auto-refresh (news) error:", e)
+        try:
+            sp = req.get('https://api.gold-api.com/price/XAU', timeout=8).json().get('price')
+            _track_spot(float(sp) if sp else None)         # keep the SPOT session hi/lo current
+        except Exception as e:
+            print("Spot sample error:", e)
         try:
             check_decision_telegram()
         except Exception as e:
