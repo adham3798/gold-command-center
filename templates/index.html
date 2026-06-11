@@ -790,6 +790,7 @@ input,select,textarea{font-family:inherit}
 
     <!-- ═══════ PAGE: WEEK GUIDE ═══════ -->
     <div class="page" id="page-weekguide">
+      <div class="card mb-20" id="week-story"><div class="loading-spinner"><div class="spinner"></div></div></div>
       <div id="wg-levels" class="card mb-20"><div class="loading-spinner"><div class="spinner"></div></div></div>
       <div class="section-title mb-12">◀ Last Trading Week — graded</div>
       <div class="wg-grid" id="wg-last"><div class="loading-spinner"><div class="spinner"></div></div></div>
@@ -1844,7 +1845,41 @@ function wgLevelsHtml(data, price){
         <div class="${cls}" style="font-size:10px">${r}${star}</div></div>`;
     }).join('')}</div>`;
 }
+async function renderWeekStory(){
+  const el=document.getElementById('week-story'); if(!el) return;
+  let w; try{ w=await fetch('/api/week-story').then(r=>r.json()); }catch(e){ el.style.display='none'; return; }
+  const reg=w.regime, regTxt=reg==='UP'?'UPTREND':reg==='DOWN'?'DOWNTREND':'no clear trend';
+  const regCls=reg==='UP'?'buy':reg==='DOWN'?'sell':'text3';
+  const readCls=r=>r==='AMPLIFIES'?'gold':r==='BULLISH'?'buy':r==='BEARISH'?'sell':'text3';
+  const conf=c=>!c?'':(c.min_cell<10?'<span class="sell" title="very small regime sample">⚠ very low confidence (n≈'+c.min_cell+'/regime)</span>':'<span class="text3">modest confidence (n='+c.n+')</span>');
+  let rows='';
+  for(const d of w.days){
+    if(d.market_closed && !d.sign) continue;
+    const c=d.col=d.char;
+    const dim=d.market_closed?'opacity:.55':'';
+    const todayMark=d.is_today?'<span class="gold" style="font-weight:800"> ● TODAY</span>':'';
+    const chg=d.sign_change?`<span class="text3 fs-11"> · ⤷ new sign${d.ingress?` ~${d.ingress.time} <span title="source timezone is unlabeled — informational only">(TZ?)</span>`:''}</span>`:'';
+    rows+=`<div style="padding:10px 0;border-top:1px solid var(--border);${dim}">
+      <div style="display:flex;align-items:baseline;gap:8px;flex-wrap:wrap">
+        <span class="text2" style="font-weight:800;min-width:90px">${d.weekday} ${d.date.slice(5)}</span>
+        <span style="font-weight:700">${d.sign_emoji||''} ${d.sign||'—'}</span>
+        ${c?`<span class="${readCls(c.read)} fs-11" style="font-weight:800;letter-spacing:.3px">${c.read}</span>`:''}
+        ${todayMark}${chg}
+      </div>
+      ${d.narrative?`<div class="text2 fs-12" style="margin-top:3px;line-height:1.5">${d.sign} ${d.narrative}.</div>`:''}
+      ${d.interp?`<div class="${reg==='DOWN'?'sell':reg==='UP'?'buy':'text2'} fs-12" style="margin-top:2px;font-weight:700">→ ${d.interp}.</div>`:''}
+      ${c?`<div class="text3 fs-11" style="margin-top:3px">avg move ${c.avg_chg>=0?'+':''}$${c.avg_chg} · ${c.pct_up}% up-days · avg range $${c.avg_range} · ${conf(c)}</div>`:''}
+    </div>`;
+  }
+  el.innerHTML = `<div class="card-header"><span class="card-title">📖 Week Story</span>`
+    + `<span class="${regCls} fs-11" style="font-weight:800">current trend: ${regTxt}</span></div>`
+    + `<div class="gold fs-11" style="background:rgba(245,164,32,.1);border-radius:8px;padding:8px 10px;margin-bottom:6px;line-height:1.5">`
+    + `⚠ GUIDELINE / context only — <b>not entry signals</b>. The per-sign character is measured from this dataset but is <b>modest and UNPROVEN out-of-sample</b> (n≈30/sign, ~10–16 per trend-regime cell, over a single trending period). Real trades still come from the <b>signal + 4H confirmation + ATR stops</b>.</div>`
+    + rows
+    + `<div class="text3 fs-11" style="margin-top:8px;line-height:1.5">“AMPLIFIES” = the sign extended the prevailing trend in <i>both</i> up and down regimes (validated). “BULLISH/BEARISH” = leaned one way in both. “MIXED” = no reliable bias. Ingress times are informational only (source timezone unlabeled). The overlap-hour and sign-change-reversal ideas were tested and did <b>not</b> hold, so they’re intentionally left out.</div>`;
+}
 async function loadWeekGuide(){
+  renderWeekStory();
   const [fr, levels, live] = await Promise.all([
     fetch('/api/forecast-range/16/16').then(r=>r.json()),
     fetch('/api/levels').then(r=>r.json()),

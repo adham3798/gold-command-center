@@ -136,6 +136,19 @@ def _clean_sign(s):
     m = re.search(r'\(([^)]+)\)', s)
     return m.group(1).strip() if m else s.replace('Moon Sign', '').replace('Sun Sign', '').strip()
 
+def _parse_ingress(text):
+    """Extract an intraday sign-change time from the raw 'Moon Sign' text, e.g.
+       'Aquarius from 15:21 (3:21 pm) Pisces'. Returns {time, from, to} or None.
+       NOTE: the source's timezone is unlabeled — this is informational only."""
+    s = str(text)
+    tm = re.search(r'(\d{1,2}:\d{2})', s)
+    if not tm:
+        return None
+    signs = [w for w in re.findall(r'[A-Z][a-z]+', s) if w in SIGN_EMOJI]
+    return {'time': tm.group(1),
+            'from': signs[0] if len(signs) >= 2 else None,
+            'to': signs[-1] if signs else None}
+
 SIGN_EMOJI = {
     'Aries':'♈','Taurus':'♉','Gemini':'♊','Cancer':'♋',
     'Leo':'♌','Virgo':'♍','Libra':'♎','Scorpio':'♏',
@@ -260,6 +273,7 @@ def load_data():
     mr = _read_tab('MOON_REAL')
     c_date   = _find_col(mr, 'Real Date', 'date')
     c_sign   = _find_col(mr, 'Clean Moon Sign', 'Moon Sign')
+    c_rawsign = _find_col(mr, 'Moon Sign')          # un-cleaned: holds intraday ingress text
     c_phase  = _find_col(mr, 'Moon Phase (Lunar Phase)', 'Moon Phase')
     c_stage  = _find_col(mr, 'Cycle Stage')
     c_gender = _find_col(mr, 'Gender')
@@ -282,6 +296,7 @@ def load_data():
             'gender':      str(r[c_gender]).strip(),
             'day_number':  int(r[c_dnum]) if pd.notna(r[c_dnum]) else None,
             'stage_num':   int(r[c_snum]) if pd.notna(r[c_snum]) else None,
+            'ingress':     _parse_ingress(r[c_rawsign]) if c_rawsign else None,
         }
 
     # ── SIGN_LIBRARY ──
@@ -350,6 +365,7 @@ def load_data():
     _MOVE_CACHE.clear()
     _MATCH_CACHE.clear()
     _MODEL_CACHE.clear()
+    _SIGN_CHAR.clear()
     _compute_moves()
     _compute_weeks()
     _compute_reaction_stats()
@@ -1643,6 +1659,99 @@ def adham_dashboard():
 def api_calendar(year, month):
     days = monthrange(year, month)[1]
     return jsonify([build_day('%d-%02d-%02d' % (year, month, d)) for d in range(1, days+1)])
+
+# ── WEEK STORY: per-moon-sign character, measured from THIS dataset (regime-split) ──
+_SIGN_CHAR = {}
+
+def _sign_character():
+    """Per-sign daily character from all history, split by prior-trend regime.
+       read: AMPLIFIES (extends the trend both ways) / BULLISH / BEARISH / MIXED."""
+    if _SIGN_CHAR:
+        return _SIGN_CHAR
+    from collections import defaultdict
+    P, M = DATA['prices'], DATA['moon']
+    days = sorted(d for d in P if P[d].get('open') is not None and P[d].get('close') is not None)
+    idx = {d: i for i, d in enumerate(days)}
+    def prior(d):
+        i = idx[d]
+        if i < 3:
+            return None
+        net = P[days[i-1]]['close'] - P[days[i-3]]['close']
+        return 'UP' if net > 0 else ('DOWN' if net < 0 else None)
+    base, up, dn, rng = defaultdict(list), defaultdict(list), defaultdict(list), defaultdict(list)
+    for d in days:
+        s = (M.get(d) or {}).get('sign'); ch = P[d].get('change')
+        if not s or ch is None:
+            continue
+        base[s].append(ch); rng[s].append(P[d]['high'] - P[d]['low'])
+        r = prior(d)
+        if r == 'UP': up[s].append(ch)
+        elif r == 'DOWN': dn[s].append(ch)
+    for s in base:
+        ch = base[s]; n = len(ch)
+        ua = (sum(up[s]) / len(up[s])) if up[s] else None
+        da = (sum(dn[s]) / len(dn[s])) if dn[s] else None
+        if ua is not None and da is not None:
+            read = ('AMPLIFIES' if (ua > 0 and da < 0) else 'BULLISH' if (ua > 0 and da > 0)
+                    else 'BEARISH' if (ua < 0 and da < 0) else 'MIXED')
+        else:
+            read = 'MIXED'
+        _SIGN_CHAR[s] = {
+            'n': n, 'avg_chg': round(sum(ch) / n, 1),
+            'pct_up': round(100 * sum(1 for x in ch if x > 0) / n),
+            'avg_range': round(sum(rng[s]) / len(rng[s])),
+            'up_n': len(up[s]), 'up_avg': round(ua, 1) if ua is not None else None,
+            'dn_n': len(dn[s]), 'dn_avg': round(da, 1) if da is not None else None,
+            'read': read, 'min_cell': min(len(up[s]), len(dn[s])),
+        }
+    return _SIGN_CHAR
+
+def _sign_story(s, c, regime):
+    """Plain-language description + regime interaction, grounded ONLY in the regime-split."""
+    if not c:
+        return None, None
+    big = c['avg_range'] >= 90 or abs(c['avg_chg']) >= 12
+    if c['read'] == 'AMPLIFIES':
+        base = 'tends to make %s moves that EXTEND the prevailing trend (validated both up & down)' % ('large' if big else 'directional')
+        interp = ('trend is DOWN → expect continuation lower / fresh lows' if regime == 'DOWN'
+                  else 'trend is UP → expect continuation higher' if regime == 'UP'
+                  else 'no clear trend yet → its push needs a trend to extend; wait for direction')
+    elif c['read'] == 'BULLISH':
+        base = 'leans up-biased across both regimes in this sample (%d%% up-days)' % c['pct_up']
+        interp = ('favor longs / dip-buys' if regime != 'DOWN'
+                  else 'up-lean against a down trend — conflicting, low confidence; defer to the signal')
+    elif c['read'] == 'BEARISH':
+        base = 'leans down-biased across both regimes in this sample'
+        interp = 'favor the short side' if regime != 'UP' else 'down-lean against an up trend — conflicting, low confidence'
+    else:
+        base = 'no reliable directional bias (mixed across regimes)'
+        interp = 'treat as neutral — follow the signal + 4H confirmation, no sign-based tilt'
+    return base, interp
+
+@app.route('/api/week-story')
+def api_week_story():
+    char = _sign_character()
+    regime = _daily_trend_asof(_trading_day())
+    td = _trading_dt(); monday = td - timedelta(days=td.weekday())
+    prev = (DATA['moon'].get((monday - timedelta(days=1)).strftime('%Y-%m-%d')) or {}).get('sign')
+    out = []
+    for i in range(7):
+        d = monday + timedelta(days=i); ds = d.strftime('%Y-%m-%d')
+        m = DATA['moon'].get(ds) or {}
+        s = m.get('sign'); c = char.get(s) if s else None
+        base, interp = _sign_story(s, c, regime)
+        out.append({
+            'date': ds, 'weekday': d.strftime('%a'),
+            'sign': s, 'sign_emoji': SIGN_EMOJI.get(s, ''),
+            'is_today': ds == _trading_day(),
+            'sign_change': bool(prev and s and s != prev),
+            'ingress': m.get('ingress'),
+            'char': c, 'narrative': base, 'interp': interp,
+            'market_closed': bool(market_closed_reason(ds, ds)),
+        })
+        if s:
+            prev = s
+    return jsonify({'regime': regime, 'days': out})
 
 @app.route('/api/day/<date_str>')
 def api_day(date_str):
