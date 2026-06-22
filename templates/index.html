@@ -677,8 +677,10 @@ input,select,textarea{font-family:inherit}
         <div id="rmap-list"></div>
       </div>
 
-      <!-- Key Levels Reaction Cheat Sheet -->
-      <div class="card mb-20">
+      <!-- Key Levels Reaction Cheat Sheet — DECLUTTER 2026-06-22: hidden. Built on tiny touch
+           counts (some <20% touched) so holds%/breaks% were noise, and it overlapped the
+           Reaction Map. To restore, delete the style="display:none" below. -->
+      <div class="card mb-20" style="display:none">
         <div class="card-header"><span class="card-title">Key Levels — Reaction Cheat Sheet</span><span class="text3 fs-11">holds% = reverses when touched · breaks% = pushes through (all history)</span></div>
         <div id="d-levels"><div class="loading-spinner"><div class="spinner"></div></div></div>
       </div>
@@ -1137,6 +1139,9 @@ function jSpark(vals){
 async function renderJournal(){
   const el=document.getElementById('journal-card'); if(!el) return;
   let s; try{ s=await fetch('/api/journal').then(r=>r.json()); }catch(e){ return; }
+  // DECLUTTER 2026-06-22: hide the Prediction Scorecard entirely until it has graded days —
+  // an empty 0/0 "BUILDING" panel is pure noise.
+  if(!s.n_graded){ el.style.display='none'; return; }
   const wr=s.win_rate_pct, ci=s.ci95_pct||[0,0], lo=ci[0], hi=ci[1];
   let badge, bcls, col;
   if(!s.n_graded){ badge='BUILDING — needs data'; bcls='text3'; col='var(--border2)'; }
@@ -1175,6 +1180,15 @@ async function renderTradeRecord(){
     .map(([k,lbl,v])=>`<span class="text3 fs-11" style="margin-right:10px">${lbl}: <b class="text2">${v}</b></span>`).join('');
   const openRows=(s.open||[]).map(o=>`<div class="text3 fs-11">● OPEN ${o.dir} @ ${fmt(o.fill&&o.fill.price)} · SL ${fmt(o.stop)} · TP ${fmt(o.take)}${o.h4_against_run?` · ${o.h4_against_run} 4H against`:''}</div>`).join('');
   const pendRows=(s.pending||[]).map(p=>`<div class="text3 fs-11">○ PENDING ${p.dir} · limit at pivot ${fmt(p.entry)} · ${p.h4_waited} 4H bar${p.h4_waited===1?'':'s'} waiting for the touch</div>`).join('');
+  // DECLUTTER 2026-06-22: with no closed trades, skip the empty 0/0 · $0.00 · win-band stats.
+  // Show only live open/pending status; hide the whole panel if nothing is live.
+  if(!s.closed){
+    if(!openRows && !pendRows){ el.style.display='none'; return; }
+    el.style.display='block'; el.style.borderLeft='4px solid var(--border2)';
+    el.innerHTML = `<div class="card-header"><span class="card-title">📈 Live Track Record <span class="text3 fs-11">· real trade rules</span></span><span class="text3 fs-11">waiting on first closed trade</span></div>`
+      + (openRows||'') + (pendRows||'');
+    return;
+  }
   el.style.display='block'; el.style.borderLeft='4px solid '+col;
   el.innerHTML = `<div class="card-header"><span class="card-title">📈 Live Track Record <span class="text3 fs-11">· real trade rules</span></span>`
     + `<span class="${bcls} fs-11" style="font-weight:800">${badge}</span></div>`
@@ -1404,9 +1418,8 @@ function reactionMap(){
   // prior-day & today reference levels (frequently-touched magnets, e.g. ~4325 = prev close)
   if(window.LC){ add('Prev Close',window.LC.close); add('Prev Open',window.LC.open); }
   if(window.TODAYOPEN!=null) add('Today Open',window.TODAYOPEN);
-  // mid-levels (M) = midpoint between consecutive main pivots — extra reaction zones
-  [['M R2–R3',R2,R3],['M R1–R2',R1,R2],['M PP–R1',PP,R1],['M S1–PP',S1,PP],['M S2–S1',S2,S1],['M S3–S2',S3,S2]]
-    .forEach(([nm,a,b])=>{ if(a!=null&&b!=null) add(nm,(a+b)/2); });
+  // DECLUTTER 2026-06-22: removed the "M" mid-levels (midpoints between pivots). They
+  // doubled the list to ~18 rows; keeping just the real pivots + prev/today references.
   lv.sort((a,b)=>b.p-a.p);                         // high → low
   const above=lv.filter(x=>x.p>px).sort((a,b)=>a.p-b.p);
   const below=lv.filter(x=>x.p<px).sort((a,b)=>b.p-a.p);
@@ -1699,16 +1712,11 @@ function renderTodayDetail(t) {
     <div class="dp-row"><span class="dr-label">Sun Sign</span><span class="dr-val">☀ ${t.sun_sign||'—'} <span class="text3 fs-11">${t.sun_bias||''}</span></span></div>
     <div class="dp-row"><span class="dr-label">Moon Phase</span><span class="dr-val">${t.phase_emoji||''} ${t.phase}</span></div>
     <div class="dp-row"><span class="dr-label">Cycle Stage</span><span class="dr-val">${t.stage} (${t.sign_keyword||''}) · Stage ${t.stage_num||'—'}</span></div>
-    <div class="dp-row"><span class="dr-label">Day Number</span><span class="dr-val">${t.day_number ?? '—'} ${t.power_day?'<span class="gold">★ POWER (3·6·9)</span>':''}</span></div>
+    <div class="dp-row"><span class="dr-label">Day Number</span><span class="dr-val">${t.day_number ?? '—'}</span></div>
     <div class="dp-row"><span class="dr-label">Gender</span><span class="dr-val">${t.gender||'—'}</span></div>
-    <div class="divider"></div>
-    <div class="dp-section-title" style="margin-bottom:6px">Score Breakdown</div>
-    <div class="dp-row"><span class="dr-label">Moon score</span><span class="dr-val ${t.moon_score>0?'buy':t.moon_score<0?'sell':''}">${t.moon_score>0?'+':''}${t.moon_score ?? '—'}</span></div>
-    <div class="dp-row"><span class="dr-label">Sun score</span><span class="dr-val ${t.sun_score>0?'buy':t.sun_score<0?'sell':''}">${t.sun_score>0?'+':''}${t.sun_score ?? '—'}</span></div>
-    <div class="dp-row"><span class="dr-label">Transit score</span><span class="dr-val ${t.transit_score>0?'buy':t.transit_score<0?'sell':''}">${t.transit_score>0?'+':''}${t.transit_score ?? '—'}</span></div>
-    <div class="dp-row"><span class="dr-label">History score</span><span class="dr-val ${t.hist_score>0?'buy':t.hist_score<0?'sell':''}">${t.hist_score>0?'+':''}${t.hist_score ?? '—'}</span></div>
-    ${(t.retrogrades&&t.retrogrades.length)?`<div class="dp-row"><span class="dr-label">Active retrogrades</span><span class="dr-val sell">${t.retrogrades.join(', ')} Rx</span></div>`:''}
-    ${(t.transit_signals&&t.transit_signals.length)?`<div class="divider"></div><div class="text2 fs-11" style="line-height:1.7">${t.transit_signals.map(s=>'• '+s).join('<br>')}</div>`:''}
+    <!-- DECLUTTER 2026-06-22: removed the astro "Score Breakdown" (Moon/Sun/Transit/History
+         scores + retrograde note) and the "★ POWER (3·6·9)" badge. These are engine internals
+         with no measured directional edge; they cluttered the analysis without informing a trade. -->
     ${t.close ? `<div class="divider"></div>
     <div class="dp-row"><span class="dr-label">Open</span><span class="dr-val">${fmt(t.open)}</span></div>
     <div class="dp-row"><span class="dr-label">High / Low</span><span class="dr-val"><span class="buy">${fmt(t.high)}</span> / <span class="sell">${fmt(t.low)}</span></span></div>

@@ -76,9 +76,12 @@
       <div class="tab" data-target="scalp">
         <span class="ico">⚔️</span><span>Scalp</span>
       </div>
+      <div class="tab" data-target="rulebook">
+        <span class="ico">📘</span><span>Rulebook</span>
+      </div>
     </div>
     <div class="spacer"></div>
-    <div class="hint">One server · localhost:5000 · switch views with the tabs</div>
+    <div class="hint">XAUUSD spot · switch views with the tabs</div>
   </div>
 
   <div class="stage">
@@ -86,6 +89,7 @@
     <!-- Adham frame loads lazily on first click so its fetch loops don't start until viewed -->
     <iframe id="frame-adham" title="ADHAM Intraday"></iframe>
     <iframe id="frame-scalp" title="Scalp"></iframe>
+    <iframe id="frame-rulebook" title="Rulebook"></iframe>
     <div class="loader" id="loader" style="display:none;">
       <div class="ring"></div><div>Loading ADHAM dashboard…</div>
     </div>
@@ -96,11 +100,13 @@
   var frames = {
     gold:  document.getElementById('frame-gold'),
     adham: document.getElementById('frame-adham'),
-    scalp: document.getElementById('frame-scalp')
+    scalp: document.getElementById('frame-scalp'),
+    rulebook: document.getElementById('frame-rulebook')
   };
   var loader = document.getElementById('loader');
   var adhamLoaded = false;
   var scalpLoaded = false;
+  var rulebookLoaded = false;
 
   function show(target){
     tabs.forEach(function(t){ t.classList.toggle('active', t.dataset.target === target); });
@@ -119,6 +125,11 @@
     if(target === 'scalp' && !scalpLoaded){
       frames.scalp.src = '/static/scalp.html';
       scalpLoaded = true;
+    }
+
+    if(target === 'rulebook' && !rulebookLoaded){
+      frames.rulebook.src = '/static/rulebook.html';
+      rulebookLoaded = true;
     }
 
     Object.keys(frames).forEach(function(k){
