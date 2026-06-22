@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Today</title>
+<style>
+  :root{
+    --gold:#FFD700; --gold2:#FFA500; --green:#00FF88; --red:#FF2244;
+    --blue:#00E5FF; --bg:#040810; --bg2:#0A1020; --panel:#0D1525;
+    --border:#1A2A40; --text:#C8D8E8; --dim:#6A809F;
+    --grnbg:#06281a; --redbg:#2a0c12; --ambbg:#2a2206; --amb:#FFC73A;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html,body{background:var(--bg);color:var(--text);font-family:'Segoe UI',Tahoma,sans-serif;font-size:14px;line-height:1.45}
+  .wrap{max-width:1180px;margin:0 auto;padding:18px}
+  .top{display:flex;align-items:center;gap:12px;margin-bottom:14px}
+  h1{font-size:17px;letter-spacing:1px;color:var(--gold)}
+  .stamp{margin-left:auto;color:var(--dim);font-size:11px}
+  .card{background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:14px 16px;margin-bottom:14px}
+  .card h2{font-size:11px;text-transform:uppercase;letter-spacing:.12em;color:var(--gold);margin-bottom:10px}
+  .grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-bottom:14px}
+  @media(max-width:780px){.grid3{grid-template-columns:1fr}}
+  .stat{background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:14px 16px}
+  .stat .lab{font-size:11px;color:var(--dim);text-transform:uppercase;letter-spacing:.1em}
+  .stat .big{font-size:26px;font-weight:800;margin-top:4px;font-variant-numeric:tabular-nums}
+  .stat .sub{font-size:12px;color:var(--dim);margin-top:2px}
+  .action{border-radius:12px;padding:14px 16px;margin-bottom:14px;font-size:14.5px;font-weight:600;line-height:1.5;border-left:4px solid var(--border)}
+  .a-buy{background:var(--grnbg);color:var(--green);border-left-color:var(--green)}
+  .a-sell{background:var(--redbg);color:var(--red);border-left-color:var(--red)}
+  .a-wait{background:var(--ambbg);color:var(--amb);border-left-color:var(--amb)}
+  .a-flat{background:var(--bg2);color:var(--text);border-left-color:var(--border)}
+  .kv{display:flex;justify-content:space-between;padding:5px 0;border-bottom:1px dashed var(--border);font-variant-numeric:tabular-nums}
+  .kv:last-child{border:0}.kv .k{color:var(--dim)} .kv .v.g{color:var(--gold)} .kv .v.up{color:var(--green)} .kv .v.dn{color:var(--red)}
+  .row2{display:grid;grid-template-columns:1fr 1fr;gap:24px}
+  @media(max-width:780px){.row2{grid-template-columns:1fr;gap:8px}}
+  .mtf{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+  .mtf .tf{background:var(--bg2);border:1px solid var(--border);border-radius:10px;padding:10px;text-align:center}
+  .mtf .tf .n{font-size:11px;color:var(--dim)} .mtf .tf .d{font-size:15px;font-weight:800;margin-top:3px}
+  .up{color:var(--green)} .dn{color:var(--red)} .nu{color:var(--dim)}
+  .scalp-frame{width:100%;height:780px;border:0;border-radius:10px;background:var(--bg)}
+  details{margin-bottom:14px} summary{cursor:pointer;color:var(--dim);font-size:12px;padding:6px 0}
+  .pill{display:inline-block;padding:2px 10px;border-radius:999px;font-size:12px;font-weight:800}
+  .pill.buy{background:var(--grnbg);color:var(--green)} .pill.sell{background:var(--redbg);color:var(--red)}
+  .pill.wait{background:var(--ambbg);color:var(--amb)} .pill.flat{background:#16223a;color:var(--dim)}
+  .foot{color:var(--dim);font-size:11px;margin-top:6px}
+  .err{color:var(--red);font-size:12px;margin-bottom:10px}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="top">
+    <h1>🎯 TODAY</h1>
+    <span id="dot" style="font-size:11px;color:var(--dim)">○ connecting…</span>
+    <span class="stamp" id="stamp"></span>
+  </div>
+  <div id="err" class="err" style="display:none"></div>
+
+  <!-- Action banner -->
+  <div class="action a-flat" id="action">Loading today's plan…</div>
+
+  <!-- Hero -->
+  <div class="grid3">
+    <div class="stat"><div class="lab">XAU/USD live</div><div class="big gold" id="px">—</div><div class="sub" id="pxchg"></div></div>
+    <div class="stat"><div class="lab">Today's signal / bias</div><div class="big" id="bias">—</div><div class="sub" id="biassub"></div></div>
+    <div class="stat"><div class="lab">Astro context</div><div class="big" id="astro" style="font-size:18px">—</div><div class="sub" id="astrosub"></div></div>
+  </div>
+
+  <!-- Level board + MTF -->
+  <div class="grid3" style="grid-template-columns:1.2fr 1fr">
+    <div class="card" style="margin:0">
+      <h2>📏 The day's levels</h2>
+      <div class="row2">
+        <div id="levels-left"></div>
+        <div id="levels-right"></div>
+      </div>
+    </div>
+    <div class="card" style="margin:0">
+      <h2>📊 Multi-timeframe trend</h2>
+      <div class="mtf" id="mtf"><span class="foot">Loading…</span></div>
+      <div class="foot" id="plan" style="margin-top:10px"></div>
+    </div>
+  </div>
+
+  <!-- Live scalp cockpit (single source: embeds the scalp page so the setup math lives in ONE place) -->
+  <div class="card">
+    <h2>⚔️ Live scalp setups, sizing &amp; no-trade gate</h2>
+    <iframe class="scalp-frame" id="scalpframe" src="/static/scalp.html" title="Live scalp setups"></iframe>
+  </div>
+
+  <!-- Collapsible astro detail (secondary — kept small on purpose) -->
+  <details>
+    <summary>▸ Astro detail (context only — not your edge)</summary>
+    <div class="card" style="margin-top:8px"><div id="astro-detail" class="fs-13"></div></div>
+  </details>
+
+  <div class="foot">Educational framework, not financial advice. Edge is in levels, execution &amp; discipline — size from your stop.</div>
+</div>
+
+<script>
+const $=id=>document.getElementById(id);
+const fmt=x=>(x==null||isNaN(x))?'—':Number(x).toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2});
+function dirCls(d){return d==='UP'?'up':d==='DOWN'?'dn':'nu'}
+function dirArrow(d){return d==='UP'?'↑ up':d==='DOWN'?'↓ down':'→ flat'}
+
+function renderAction(t, trends){
+  const el=$('action');
+  if(!t){ el.className='action a-flat'; el.textContent='No data yet.'; return; }
+  const dir=(!t.market_closed&&t.signal)&&(/BUY/.test(t.signal)?'BUY':(/SELL/.test(t.signal)?'SELL':null));
+  if(t.market_closed){ el.className='action a-flat'; el.innerHTML='🚫 Market closed — no trade today.'; return; }
+  if(!dir){ el.className='action a-wait'; el.innerHTML='⏳ No trade signal today (WAIT / NO TRADE) — stand aside.'; return; }
+  const pl=t.plan4h||{};
+  const entry=pl.zone_low!=null?(fmt(pl.zone_low)+'–'+fmt(pl.zone_high)):(pl.entry!=null?fmt(pl.entry):'—');
+  const sl=pl.stop!=null?fmt(pl.stop):'—', tp=pl.target!=null?fmt(pl.target):'—';
+  const h4dir=(trends&&trends.h4&&trends.h4.dir)||t.h4_dir;
+  const wait4h=h4dir&&!((dir==='BUY'&&h4dir==='UP')||(dir==='SELL'&&h4dir==='DOWN'));
+  if(wait4h){ el.className='action a-wait'; el.innerHTML=`⏳ <b>WAIT — daily says ${dir} but the 4-hour isn't ${dir==='BUY'?'up':'down'} yet.</b> Hold for the 4H candle to confirm before entering.`; }
+  else if(t.mtf_with_trend===true){ el.className='action '+(dir==='BUY'?'a-buy':'a-sell'); el.innerHTML=`✅ <b>WITH-TREND ${dir} today</b> — 4H confirms, take it. Entry ${entry} · stop ${sl} · target ${tp}.`; }
+  else if(t.mtf_with_trend===false){ el.className='action a-wait'; el.innerHTML=`⚠️ <b>Counter-trend ${dir} → skip / wait.</b> Don't fight the daily trend.`; }
+  else { el.className='action a-flat'; el.innerHTML=`ℹ️ ${dir} signal, no clear trend. Trade with care. Entry ${entry} · stop ${sl} · target ${tp}.`; }
+}
+
+function renderHero(t, px){
+  $('px').textContent = px!=null?fmt(px):'—';
+  const dir=t&&t.signal&&(/BUY/.test(t.signal)?'BUY':(/SELL/.test(t.signal)?'SELL':'WAIT'));
+  const cls=dir==='BUY'?'up':dir==='SELL'?'dn':'nu';
+  $('bias').innerHTML=`<span class="${cls}">${t&&t.signal?t.signal:'—'}</span>`;
+  $('biassub').textContent=t?`${t.trend_regime?('trend '+t.trend_regime.toLowerCase()):''}${t.confidence?(' · '+t.confidence+'% conf'):''}`:'';
+  $('astro').textContent=t?`${t.sign||'—'}${t.phase?(' · '+t.phase):''}`:'—';
+  $('astrosub').textContent=t&&t.mtf_label?t.mtf_label:'';
+}
+
+function renderLevels(t, levels){
+  const find=n=>{const x=(levels||[]).find(y=>y.name===n);return x?x.price:null};
+  const lc=t&&t.last_close||{}, pl=t&&t.plan4h||{};
+  const L=[['R2',find('R2')],['R1',find('R1')],['Pivot (PP)',lc.pp!=null?lc.pp:find('PP')],['S1',find('S1')],['S2',find('S2')]];
+  $('levels-left').innerHTML = L.map(([k,v])=>`<div class="kv"><span class="k">${k}</span><span class="v ${k.indexOf('Pivot')>=0?'g':''}">${fmt(v)}</span></div>`).join('');
+  const R=[['Prev High',lc.high],['Prev Low',lc.low],['Today O',t&&t.today_open],['Today H / L',null]];
+  let html='';
+  html+=`<div class="kv"><span class="k">Prev High / Low</span><span class="v">${fmt(lc.high)} / ${fmt(lc.low)}</span></div>`;
+  html+=`<div class="kv"><span class="k">Today O</span><span class="v">${fmt(t&&t.today_open)}</span></div>`;
+  html+=`<div class="kv"><span class="k">Today H / L</span><span class="v"><span class="up">${fmt(t&&t.today_high)}</span> / <span class="dn">${fmt(t&&t.today_low)}</span></span></div>`;
+  if(pl.zone_low!=null||pl.entry!=null) html+=`<div class="kv"><span class="k">Plan entry</span><span class="v g">${pl.zone_low!=null?(fmt(pl.zone_low)+'–'+fmt(pl.zone_high)):fmt(pl.entry)}</span></div>`;
+  if(pl.stop!=null) html+=`<div class="kv"><span class="k">Plan stop / target</span><span class="v">${fmt(pl.stop)} / ${fmt(pl.target)}</span></div>`;
+  $('levels-right').innerHTML=html;
+}
+
+function renderTrends(trends, t){
+  if(!trends){ $('mtf').innerHTML='<span class="foot">unavailable</span>'; return; }
+  const tf=(name,o)=>`<div class="tf"><div class="n">${name}</div><div class="d ${dirCls(o&&o.dir)}">${dirArrow(o&&o.dir)}</div></div>`;
+  $('mtf').innerHTML = tf('Daily',trends.daily)+tf('4-Hour',trends.h4)+tf('1-Hour',trends.h1);
+  const pl=t&&t.plan4h||{};
+  if(t&&t.signal&&pl.stop!=null){ $('plan').innerHTML=`Plan: ${/BUY/.test(t.signal)?'long':'short'} · entry ${pl.zone_low!=null?(fmt(pl.zone_low)+'–'+fmt(pl.zone_high)):fmt(pl.entry)} · stop ${fmt(pl.stop)} · target ${fmt(pl.target)}`; }
+}
+
+function renderAstroDetail(t){
+  if(!t){ $('astro-detail').innerHTML='—'; return; }
+  const row=(k,v)=>`<div class="kv"><span class="k">${k}</span><span class="v">${v??'—'}</span></div>`;
+  $('astro-detail').innerHTML = row('Moon sign',t.sign)+row('Phase',t.phase)+row('Cycle stage',t.stage)
+    +row('Day number',t.day_number)+row('Confidence',t.confidence?t.confidence+'%':'—')
+    +`<div class="foot" style="margin-top:8px">Astro is context, not a buy/sell trigger — the spot-data study showed no directional edge here. Trade the levels and the 4H confirm.</div>`;
+}
+
+async function load(){
+  const dot=$('dot');
+  try{
+    const [dash, trends, lv, lp] = await Promise.all([
+      fetch('/api/dashboard',{cache:'no-store'}).then(r=>r.json()),
+      fetch('/api/trends',{cache:'no-store'}).then(r=>r.json()).catch(()=>null),
+      fetch('/api/levels',{cache:'no-store'}).then(r=>r.json()).catch(()=>({levels:[]})),
+      fetch('/api/live-price',{cache:'no-store'}).then(r=>r.json()).catch(()=>null),
+    ]);
+    const t = dash.today;
+    const px = (lp&&(lp.price!=null?lp.price:lp.live))!=null ? (lp.price!=null?lp.price:lp.live) : (t&&t.close);
+    window.__t=t;
+    renderAction(t, trends);
+    renderHero(t, px);
+    renderLevels(t, (lv&&lv.levels)||[]);
+    renderTrends(trends, t);
+    renderAstroDetail(t);
+    $('pxchg').textContent = t&&t.change!=null ? ((t.change>=0?'+':'')+fmt(t.change)+(t.change_pct!=null?` (${t.change_pct>=0?'+':''}${t.change_pct}%)`:'')) : '';
+    dot.textContent='● live'; dot.style.color='var(--green)';
+    $('stamp').textContent='updated '+new Date().toLocaleTimeString();
+    $('err').style.display='none';
+  }catch(e){
+    dot.textContent='○ offline'; dot.style.color='var(--red)';
+    $('err').style.display='block'; $('err').textContent='Could not reach the data feed — retrying…';
+  }
+}
+load();
+setInterval(load, 45000);
+</script>
+</body>
+</html>

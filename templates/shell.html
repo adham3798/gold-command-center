@@ -17,7 +17,7 @@
     height:54px; display:flex; align-items:center; gap:18px;
     padding:0 16px; background:linear-gradient(90deg,#0A1020,#0F1830);
     border-bottom:2px solid var(--border); box-shadow:0 2px 14px rgba(0,0,0,.6);
-    position:relative; z-index:10;
+    position:relative; z-index:20;
   }
   .brand{display:flex; align-items:baseline; gap:8px; white-space:nowrap;}
   .brand .logo{font-size:18px; font-weight:800; letter-spacing:2px;
@@ -26,7 +26,7 @@
   .brand .sub{font-size:11px; color:var(--dim); letter-spacing:3px;}
   .tabs{display:flex; gap:8px; margin-left:8px;}
   .tab{
-    display:flex; align-items:center; gap:8px;
+    display:flex; align-items:center; gap:8px; position:relative;
     padding:8px 18px; border:1px solid var(--border); border-radius:10px;
     background:var(--panel); color:var(--text); cursor:pointer;
     font-size:13px; font-weight:600; letter-spacing:.5px;
@@ -39,6 +39,19 @@
     box-shadow:0 0 14px rgba(255,215,0,.25);
   }
   .tab .ico{font-size:16px;}
+  .menu{
+    position:absolute; top:44px; left:0; min-width:240px;
+    background:var(--panel); border:1px solid var(--border); border-radius:10px;
+    box-shadow:0 8px 24px rgba(0,0,0,.6); padding:6px; display:none; z-index:30;
+  }
+  .menu.open{display:block;}
+  .mitem{
+    display:flex; align-items:center; gap:8px; padding:9px 12px; border-radius:8px;
+    color:var(--text); font-size:13px; font-weight:600; cursor:pointer; white-space:nowrap;
+  }
+  .mitem:hover{background:rgba(255,215,0,.10); color:var(--gold);}
+  .mitem .ico{font-size:15px;}
+  .mhint{color:var(--dim); font-size:11px; padding:6px 12px 4px;}
   .spacer{flex:1;}
   .hint{font-size:11px; color:var(--dim); white-space:nowrap;}
   .stage{position:absolute; top:54px; left:0; right:0; bottom:0;}
@@ -64,82 +77,98 @@
   <div class="topbar">
     <div class="brand">
       <span class="logo">GOLD COMMAND CENTER</span>
-      <span class="sub">XAUUSD · ASTRO · INTRADAY</span>
+      <span class="sub">XAUUSD</span>
     </div>
     <div class="tabs">
-      <div class="tab active" data-target="gold">
-        <span class="ico">🌙</span><span>Moon Calendar &amp; Predictions</span>
+      <div class="tab active" data-target="today">
+        <span class="ico">🎯</span><span>Today</span>
       </div>
-      <div class="tab" data-target="adham">
-        <span class="ico">⚡</span><span>ADHAM Intraday</span>
-      </div>
-      <div class="tab" data-target="scalp">
-        <span class="ico">⚔️</span><span>Scalp</span>
+      <div class="tab" data-target="week">
+        <span class="ico">📅</span><span>Week</span>
       </div>
       <div class="tab" data-target="rulebook">
         <span class="ico">📘</span><span>Rulebook</span>
       </div>
+      <div class="tab" id="moretab">
+        <span class="ico">⋯</span><span id="morelabel">More ▾</span>
+        <div class="menu" id="moremenu">
+          <div class="mhint">Reference &amp; detailed views</div>
+          <div class="mitem" data-target="predictions"><span class="ico">🌙</span> Moon Calendar &amp; Predictions</div>
+          <div class="mitem" data-target="adham"><span class="ico">⚡</span> ADHAM Intraday (deep astro)</div>
+          <div class="mitem" data-target="scalp"><span class="ico">⚔️</span> Scalp (full screen)</div>
+        </div>
+      </div>
     </div>
     <div class="spacer"></div>
-    <div class="hint">XAUUSD spot · switch views with the tabs</div>
+    <div class="hint">Today = trade now · Week = plan ahead</div>
   </div>
 
   <div class="stage">
-    <iframe id="frame-gold"  class="active" src="/gold"  title="Moon Calendar &amp; Predictions"></iframe>
-    <!-- Adham frame loads lazily on first click so its fetch loops don't start until viewed -->
+    <!-- Today loads eagerly (the home view); the rest load lazily on first open -->
+    <iframe id="frame-today" class="active" src="/static/today.html" title="Today"></iframe>
+    <iframe id="frame-week" title="Week"></iframe>
+    <iframe id="frame-rulebook" title="Rulebook"></iframe>
+    <iframe id="frame-predictions" title="Moon Calendar &amp; Predictions"></iframe>
     <iframe id="frame-adham" title="ADHAM Intraday"></iframe>
     <iframe id="frame-scalp" title="Scalp"></iframe>
-    <iframe id="frame-rulebook" title="Rulebook"></iframe>
     <div class="loader" id="loader" style="display:none;">
-      <div class="ring"></div><div>Loading ADHAM dashboard…</div>
+      <div class="ring"></div><div id="loadtext">Loading…</div>
     </div>
   </div>
 
 <script>
-  var tabs   = document.querySelectorAll('.tab');
-  var frames = {
-    gold:  document.getElementById('frame-gold'),
-    adham: document.getElementById('frame-adham'),
-    scalp: document.getElementById('frame-scalp'),
-    rulebook: document.getElementById('frame-rulebook')
+  var SRC = {
+    today:'/static/today.html', week:'/static/week.html', rulebook:'/static/rulebook.html',
+    predictions:'/gold', adham:'/adham', scalp:'/static/scalp.html'
   };
+  var LABEL = {
+    predictions:'🌙 Predictions', adham:'⚡ ADHAM', scalp:'⚔️ Scalp'
+  };
+  var MORE = ['predictions','adham','scalp'];
+  var HEAVY = {predictions:1, adham:1};        // show spinner for these
+  var loaded = {today:true};                   // today preloaded via src attr
+  var topTabs = document.querySelectorAll('.tab[data-target]');
+  var moretab = document.getElementById('moretab');
+  var moremenu = document.getElementById('moremenu');
+  var morelabel = document.getElementById('morelabel');
   var loader = document.getElementById('loader');
-  var adhamLoaded = false;
-  var scalpLoaded = false;
-  var rulebookLoaded = false;
+  var loadtext = document.getElementById('loadtext');
+
+  function frame(t){ return document.getElementById('frame-' + t); }
 
   function show(target){
-    tabs.forEach(function(t){ t.classList.toggle('active', t.dataset.target === target); });
-
-    if(target === 'adham' && !adhamLoaded){
-      loader.style.display = 'flex';
-      loader.style.opacity = '1';
-      frames.adham.src = '/adham';
-      adhamLoaded = true;
-      frames.adham.addEventListener('load', function(){
-        loader.style.opacity = '0';
-        setTimeout(function(){ loader.style.display = 'none'; }, 400);
+    // lazy-load
+    if(!loaded[target]){
+      if(HEAVY[target]){ loader.style.display='flex'; loader.style.opacity='1'; loadtext.textContent='Loading…'; }
+      frame(target).src = SRC[target];
+      loaded[target] = true;
+      frame(target).addEventListener('load', function(){
+        loader.style.opacity='0'; setTimeout(function(){ loader.style.display='none'; }, 400);
       }, { once:true });
     }
-
-    if(target === 'scalp' && !scalpLoaded){
-      frames.scalp.src = '/static/scalp.html';
-      scalpLoaded = true;
-    }
-
-    if(target === 'rulebook' && !rulebookLoaded){
-      frames.rulebook.src = '/static/rulebook.html';
-      rulebookLoaded = true;
-    }
-
-    Object.keys(frames).forEach(function(k){
-      frames[k].classList.toggle('active', k === target);
-    });
+    // toggle frames
+    Object.keys(SRC).forEach(function(k){ frame(k).classList.toggle('active', k === target); });
+    // toggle top tabs
+    var isMore = MORE.indexOf(target) >= 0;
+    topTabs.forEach(function(t){ t.classList.toggle('active', t.dataset.target === target); });
+    moretab.classList.toggle('active', isMore);
+    morelabel.textContent = isMore ? LABEL[target] : 'More ▾';
+    moremenu.classList.remove('open');
   }
 
-  tabs.forEach(function(t){
+  topTabs.forEach(function(t){
     t.addEventListener('click', function(){ show(t.dataset.target); });
   });
+  // More dropdown
+  moretab.addEventListener('click', function(e){
+    if(e.target.closest('.mitem')) return;     // item clicks handled below
+    e.stopPropagation();
+    moremenu.classList.toggle('open');
+  });
+  moremenu.querySelectorAll('.mitem').forEach(function(it){
+    it.addEventListener('click', function(e){ e.stopPropagation(); show(it.dataset.target); });
+  });
+  document.addEventListener('click', function(){ moremenu.classList.remove('open'); });
 </script>
 </body>
 </html>
