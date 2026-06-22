@@ -53,6 +53,13 @@
 <div class="wrap">
   <h1>⚔️ SCALP COMMAND <span class="stamp" id="stamp"></span></h1>
   <div class="sub">XAUUSD spot · 5m–30m · live setup, levels, sizing &amp; no-trade gate</div>
+  <div id="livebar" style="display:flex;align-items:center;gap:10px;margin:6px 0 14px;font-size:11px">
+    <span id="livedot" style="font-weight:800;color:var(--dim)">○ connecting…</span>
+    <label style="display:flex;align-items:center;gap:5px;color:var(--dim);cursor:pointer">
+      <input type="checkbox" id="liveon" checked style="width:auto"> auto-fill from live feed
+    </label>
+    <span id="livesrc" style="color:var(--dim)"></span>
+  </div>
   <div class="grid">
     <div>
       <div class="card">
@@ -182,9 +189,40 @@ function build(){
   $("stamp").textContent="updated "+new Date().toLocaleTimeString();
   save();
 }
-$("reset").onclick=()=>{ids.forEach(k=>{const el=$(k);if(el)el.value=SAMPLE[k]});build();};
-document.querySelectorAll("input,select").forEach(el=>el.addEventListener("input",build));
-load();build();
+// ── live feed wiring (same-origin /api/scalp) ──────────────────────────────
+const LIVE_MAP={price:"px",pdh:"pdh",pdl:"pdl",vwap:"vw",ema21:"e21",
+  rsi:"rsi",atr5:"a5",atr15:"a15",orh:"orh",orl:"orl"};
+const touched=new Set();
+function markTouched(e){if(e&&e.target&&e.target.id)touched.add(e.target.id);}
+async function fetchLive(){
+  const dot=$("livedot"), src=$("livesrc");
+  if(!$("liveon").checked){dot.textContent="○ live off";dot.style.color="var(--dim)";src.textContent="";return;}
+  try{
+    const r=await fetch("/api/scalp",{cache:"no-store"});
+    if(!r.ok)throw 0;
+    const d=await r.json();
+    let filled=0;
+    for(const key in LIVE_MAP){
+      const id=LIVE_MAP[key], v=d[key];
+      if(v===null||v===undefined||isNaN(v))continue;
+      if(touched.has(id))continue;            // never clobber a field you edited
+      const el=$(id); if(el){el.value=v; filled++;}
+    }
+    const feed = d.source==="intraday-feed";
+    dot.textContent = feed ? "● LIVE — full feed" : "● LIVE — price + levels";
+    dot.style.color = feed ? "var(--green)" : "var(--gold)";
+    src.textContent = feed ? "(VWAP/EMA/RSI/ATR/OR auto from 5m feed)"
+                           : "(run intraday_feed.gs for VWAP/EMA/RSI/ATR auto-fill)";
+    build();
+  }catch(e){
+    dot.textContent="○ offline — manual entry"; dot.style.color="var(--red)"; src.textContent="";
+  }
+}
+$("reset").onclick=()=>{touched.clear();ids.forEach(k=>{const el=$(k);if(el)el.value=SAMPLE[k]});build();fetchLive();};
+document.querySelectorAll("input,select").forEach(el=>{el.addEventListener("input",build);el.addEventListener("input",markTouched);});
+$("liveon").addEventListener("change",fetchLive);
+load();build();fetchLive();
+setInterval(fetchLive,45000);
 </script>
 </body>
 </html>
