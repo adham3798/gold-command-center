@@ -89,7 +89,7 @@ for i in range(1,len(DAYS)):
         'Model Dir':'BUY' if d>0 else 'SELL','Rule (why)':rule,'Prior Day':P[prev]['dir'],
         'Moon Sign':m['sign'],'Nature':NAT.get(m['sign'],''),'Stage':m['stage'],
         'Day#':int(m['dn']) if pd.notna(m['dn']) else '','Date#':droot(ds[-2:]),
-        'Important(3/7/9)':'Y' if droot(ds[-2:]) in (3,7,9) else '','9-date':'Y' if droot(ds[-2:])==9 else '',
+        'Important(3/6/9)':'Y' if droot(ds[-2:]) in (3,6,9) else '','9-date':'Y' if droot(ds[-2:])==9 else '',
         'Moon Phase':m['phase'],'Open':round(o,2),'High':round(h,2),'Low':round(l,2),'Close':round(p['c'],2),
         'Actual':p['dir'],'Range':round(h-l,2),'Exp Move':round(mv,2),'TP1':round(tp,2),'Stop':round(slv,2),
         'TP hit':'Y' if th else 'N','Stop hit':'Y' if sh else 'N','Retrogrades':', '.join(active_retros(ds))})

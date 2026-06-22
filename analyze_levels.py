@@ -85,13 +85,13 @@ print('   today HIGH reaches R1:                %s (%d/%d)'%(pct(r1r[0],r1r[1]),
 print('   today breaks YESTERDAY HIGH:          %s (%d/%d)'%(pct(yhB[0],yhB[1]),yhB[0],yhB[1]))
 print('   today breaks YESTERDAY LOW:           %s (%d/%d)'%(pct(ylB[0],ylB[1]),ylB[0],ylB[1]))
 
-# 5) Important date (3/7/9) move size vs normal
-print('\n[5] IMPORTANT DATES (digit-root 3/7/9) -> bigger move?')
+# 5) Important date (3/6/9) move size vs normal
+print('\n[5] IMPORTANT DATES (digit-root 3/6/9) -> bigger move?')
 imp=[]; non=[]
 for d in DAYS:
     rng=P[d]['h']-P[d]['l']
-    (imp if droot(int(d[-2:])) in (3,7,9) else non).append(rng)
-print('   avg daily RANGE on 3/7/9 dates: $%.1f (%d days)'%(st.mean(imp),len(imp)))
+    (imp if droot(int(d[-2:])) in (3,6,9) else non).append(rng)
+print('   avg daily RANGE on 3/6/9 dates: $%.1f (%d days)'%(st.mean(imp),len(imp)))
 print('   avg daily RANGE other dates:    $%.1f (%d days)'%(st.mean(non),len(non)))
 
 # 6) Stage behaviour

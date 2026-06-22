@@ -294,7 +294,7 @@ def load_data():
             'phase_emoji': get_phase_emoji(phase),
             'stage':       str(r[c_stage]).strip(),
             'gender':      str(r[c_gender]).strip(),
-            'day_number':  int(r[c_dnum]) if pd.notna(r[c_dnum]) else None,
+            'day_number':  _numerology_day(d),
             'stage_num':   int(r[c_snum]) if pd.notna(r[c_snum]) else None,
             'ingress':     _parse_ingress(r[c_rawsign]) if c_rawsign else None,
         }
@@ -626,7 +626,7 @@ GOLD_HOLIDAYS = {
 MOVABLE_SIGNS = {'Aries', 'Cancer', 'Libra', 'Capricorn'}   # nature = MOVABLE
 
 def _date_digit_root(date_str):
-    """Day-of-month reduced to a single digit (e.g. 18 -> 9). 3/7/9 = 'important date'."""
+    """Day-of-month reduced to a single digit (e.g. 18 -> 9). 3/6/9 = 'important date'."""
     try:
         d = int(date_str.split('-')[2])
     except (ValueError, IndexError):
@@ -634,6 +634,19 @@ def _date_digit_root(date_str):
     while d > 9:
         d = sum(int(c) for c in str(d))
     return d
+
+def _numerology_day(date_str):
+    """Universal numerology day number: sum ALL digits of YYYY-MM-DD, reduce to 1-9.
+    This is the real astrological day number (3/6/9 = power day), NOT the sheet's
+    1-730 row index that was being shown before (e.g. 538)."""
+    try:
+        digits = [int(c) for c in str(date_str).replace('-', '') if c.isdigit()]
+    except Exception:
+        return None
+    s = sum(digits)
+    while s > 9:
+        s = sum(int(c) for c in str(s))
+    return s or 9
 
 def _prev_trading_day(date_str, today):
     from datetime import timedelta
@@ -775,13 +788,13 @@ def _signal_reason(day):
         if 'BUY' in sig:    parts.append("%g%% bull history" % bp)
         elif 'SELL' in sig: parts.append("%g%% bear history" % brp)
     if day.get('power_day'):
-        parts.append("day-%s power(3·7·9)" % day.get('day_number'))
+        parts.append("day-%s power(3·6·9)" % day.get('day_number'))
     if day.get('mtf_score'):
         parts.append("multi-TF %s" % ('up' if day['mtf_score'] > 0 else 'down'))
     if day.get('pullback'):
         parts.insert(0, 'movable 2-day pullback (reverse of prior day)')
     if day.get('power_date'):
-        parts.append('★ important date (3·7·9) — bigger move')
+        parts.append('★ important date (3·6·9) — bigger move')
     verb = {'STRONG BUY':'Strong BUY','BUY':'BUY','SELL':'SELL','STRONG SELL':'Strong SELL',
             'WAIT':'WAIT','NO TRADE':'NO TRADE'}.get(sig, sig)
     if not parts:
@@ -1498,8 +1511,8 @@ def build_day(date_str):
             day['target_anchor'] = round(anchor, 2)
             day['target_is_est'] = day.get('open') is None          # future days anchor on last close
 
-    # ── RULE 3: important DATE (day-of-month digit-root 3/7/9) amplifies the move ──
-    day['power_date'] = _date_digit_root(date_str) in (3, 7, 9)
+    # ── RULE 3: important DATE (day-of-month digit-root 3/6/9) amplifies the move ──
+    day['power_date'] = _date_digit_root(date_str) in (3, 6, 9)
     if day.get('power_date') and day.get('expected_move'):
         day['expected_move'] = round(day['expected_move'] * 1.2, 2)
         anc = day.get('target_anchor')

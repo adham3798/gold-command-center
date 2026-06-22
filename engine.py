@@ -102,6 +102,25 @@ SUN_DB = [
 POWER_NUMBERS = {3, 6, 9}
 
 
+def reduce_day_number(dn):
+    """Reduce any day number to its 1-9 numerology digit-root.
+
+    Defensive: the source sheet's 'day number' column is a 1-730 running index,
+    NOT the numerology day. If that index (e.g. 538) reaches the engine, the
+    3/6/9 power rule never fires. Reducing here guarantees the power logic works
+    regardless of what the caller passes. (5+3+8=16 -> 1+6=7.)
+    """
+    try:
+        n = int(dn)
+    except (TypeError, ValueError):
+        return None
+    if n <= 0:
+        return None
+    while n > 9:
+        n = sum(int(c) for c in str(n))
+    return n or 9
+
+
 # ───────────────────────── helpers ─────────────────────────
 def _parse(ds):
     """Parse 'M/D/YYYY' (transit data) or 'YYYY-MM-DD' (app dates)."""
@@ -331,7 +350,7 @@ def compute_signal(date_str, moon, hist_counts, history, price=None, mtf=None):
         return None
     sign  = moon.get('sign')
     stage = moon.get('stage')
-    dn    = moon.get('day_number')
+    dn    = reduce_day_number(moon.get('day_number'))   # FIX: real 1-9 numerology day
     sun   = moon.get('sun_sign')
 
     # FIX 3: TREND bias follows price STRUCTURE (mtf), never the realized close.
