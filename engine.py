@@ -249,9 +249,12 @@ def sun_score(sun_sign):
 
 def day_number_weight(dn):
     """Magnitude multiplier from the 1-9 day number.
-    FIX 1: 3/6/9 are the strong "power" days (9>6>3); 7 is ordinary."""
-    table = {1:0.85, 2:0.90, 3:1.20, 4:0.85, 5:0.90, 6:1.30, 7:0.90, 8:0.85, 9:1.40}
-    return table.get(dn, 1.0)
+    REVIEW 2026-06-22: the 3/6/9 'power day' edge does NOT hold on verified spot data
+    (day 9 was the WEAKEST at 48.7%, 3/6 middling, move-size identical to other days).
+    Neutralized to 1.0 so the day number no longer amplifies the direction/conviction.
+    `power_day` is kept downstream as a context LABEL only — never a size or direction
+    driver. See ASTRO_EDGE_FINDINGS.md and SYSTEM_REVIEW_2026-06-22.md."""
+    return 1.0
 
 # moon-phase reliability (for confidence) — keys normalised to lower-case
 PHASE_RELIABILITY = {
@@ -285,8 +288,8 @@ def calc_confidence(today, history):
     f4m = [r for r in history if r.get('day_number') == dn and r.get('gender') == g]
     f4s = min(100, len(f4m) / 4 * 100)
     conf = f1s * .30 + f2s * .25 + f3s * .25 + f4s * .20
-    if dn in POWER_NUMBERS:            # power-day conviction boost
-        conf = min(100, conf + 8)
+    # REVIEW 2026-06-22: removed the +8 power-day conviction boost — 3/6/9 carries no
+    # directional edge on verified spot data, so it must not inflate confidence either.
     return round(conf), {
         'sign_stage': len(f1m), 'stage_num': len(f2m),
         'phase': f3s, 'day_num': len(f4m), 'power_day': dn in POWER_NUMBERS,
