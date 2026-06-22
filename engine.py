@@ -102,25 +102,6 @@ SUN_DB = [
 POWER_NUMBERS = {3, 6, 9}
 
 
-def reduce_day_number(dn):
-    """Reduce any day number to its 1-9 numerology digit-root.
-
-    Defensive: the source sheet's 'day number' column is a 1-730 running index,
-    NOT the numerology day. If that index (e.g. 538) reaches the engine, the
-    3/6/9 power rule never fires. Reducing here guarantees the power logic works
-    regardless of what the caller passes. (5+3+8=16 -> 1+6=7.)
-    """
-    try:
-        n = int(dn)
-    except (TypeError, ValueError):
-        return None
-    if n <= 0:
-        return None
-    while n > 9:
-        n = sum(int(c) for c in str(n))
-    return n or 9
-
-
 # ───────────────────────── helpers ─────────────────────────
 def _parse(ds):
     """Parse 'M/D/YYYY' (transit data) or 'YYYY-MM-DD' (app dates)."""
@@ -331,7 +312,43 @@ _W_NO_MTF = {'hist': 0.40, 'moon': 0.30, 'transit': 0.18, 'sun': 0.12}
 _W_MTF    = {'hist': 0.30, 'moon': 0.24, 'transit': 0.14, 'sun': 0.10, 'mtf': 0.22}
 
 
-def compute_signal(date_str, moon, hist_counts, history, price=None, mtf=None):
+def signphase_bias(sign_counts, phase_counts, overall_counts, min_n=6):
+    """NEW direction rule — the one the spot-data study actually supports.
+
+    The edge lives in the MOON SIGN and MOON PHASE, not the day number. This scores how
+    the current sign and phase have historically biased gold RELATIVE to its own drift
+    (so it isolates the astrological signal, not 'gold went up'). All counts are
+    point-in-time (prior days only), so there is no look-ahead.
+
+    Returns (bias_pct -100..100, p_up 0-1, detail dict). p_up>0.5 leans long.
+    """
+    def rate(c):
+        c = c or {}
+        b, r = c.get('bull', 0), c.get('bear', 0)
+        t = b + r
+        return (b / t, t) if t else (None, 0)
+
+    o_p, _ = rate(overall_counts)
+    s_p, s_t = rate(sign_counts)
+    p_p, p_t = rate(phase_counts)
+    if o_p is None:
+        o_p = 0.5
+    edge, used = 0.0, False
+    if s_p is not None and s_t >= min_n:
+        edge += 0.6 * (s_p - o_p); used = True
+    if p_p is not None and p_t >= min_n:
+        edge += 0.4 * (p_p - o_p); used = True
+    p_up = o_p + edge
+    bias = _clamp((p_up - 0.5) * 350, -100, 100)   # ~0.546 -> +16 (BUY), ~0.454 -> -16 (SELL)
+    return round(bias, 1), round(p_up, 3), {
+        'sign_bull': None if s_p is None else round(s_p, 3), 'sign_n': s_t,
+        'phase_bull': None if p_p is None else round(p_p, 3), 'phase_n': p_t,
+        'overall_bull': round(o_p, 3), 'used': used,
+    }
+
+
+def compute_signal(date_str, moon, hist_counts, history, price=None, mtf=None,
+                   sign_counts=None, phase_counts=None, overall_counts=None):
     """
     Full ADHAM-style daily signal.
 
@@ -350,7 +367,7 @@ def compute_signal(date_str, moon, hist_counts, history, price=None, mtf=None):
         return None
     sign  = moon.get('sign')
     stage = moon.get('stage')
-    dn    = reduce_day_number(moon.get('day_number'))   # FIX: real 1-9 numerology day
+    dn    = moon.get('day_number')
     sun   = moon.get('sun_sign')
 
     # FIX 3: TREND bias follows price STRUCTURE (mtf), never the realized close.
@@ -392,15 +409,36 @@ def compute_signal(date_str, moon, hist_counts, history, price=None, mtf=None):
     bias_pct = round(_clamp(blend * dmult * 100, -100, 100), 1)
     bias_raw = round(blend * dmult, 3)
 
-    sig, key = signal_label(bias_pct)
-
-    conf, conf_break = calc_confidence(
-        {'sign':sign,'stage':stage,'stage_num':moon.get('stage_num'),
-         'day_number':dn,'gender':moon.get('gender'),'phase':moon.get('phase')},
-        history)
-
     retros = get_active_retrogrades(date_str)
     transits_today = [t for t in get_today_transits(date_str) if abs(t['diff']) <= 1]
+
+    # ── NEW DIRECTION RULE (opt-in): when point-in-time sign/phase counts are supplied,
+    #    the moon SIGN + PHASE rule decides direction (it beats the old blend on spot data:
+    #    ~55% vs ~45%). The old blend stays the fallback when counts are absent. ──
+    method = 'blend'
+    sp_pup = None
+    sp_detail = None
+    if sign_counts is not None and phase_counts is not None and overall_counts is not None:
+        sp_bias, sp_pup, sp_detail = signphase_bias(sign_counts, phase_counts, overall_counts)
+        if any('Eclipse' in t['e'] for t in transits_today):   # risk-off near eclipses
+            sp_bias = 0.0
+            sp_detail['eclipse_standaside'] = True
+        bias_pct = round(sp_bias, 1)
+        bias_raw = round(sp_bias / 100.0, 3)
+        method = 'signphase'
+
+    sig, key = signal_label(bias_pct)
+
+    if method == 'signphase':
+        n = (sp_detail['sign_n'] + sp_detail['phase_n'])
+        conf = int(_clamp(50 + abs(bias_pct) / 2.5 + min(15, n / 8.0), 0, 95))
+        conf_break = {'method': 'signphase', 'sign_n': sp_detail['sign_n'],
+                      'phase_n': sp_detail['phase_n'], 'p_up': sp_pup}
+    else:
+        conf, conf_break = calc_confidence(
+            {'sign':sign,'stage':stage,'stage_num':moon.get('stage_num'),
+             'day_number':dn,'gender':moon.get('gender'),'phase':moon.get('phase')},
+            history)
 
     out = {
         'signal': sig, 'signal_key': key,
@@ -416,6 +454,7 @@ def compute_signal(date_str, moon, hist_counts, history, price=None, mtf=None):
         'retrogrades': retros,
         'transit_signals': tSigs,
         'transits_today': [t['e'] for t in transits_today],
+        'method': method, 'p_up': sp_pup, 'sign_phase': sp_detail,
     }
     # win/loss is decided by the caller's take-profit model (did Low reach the
     # downside TP for SELL / High reach upside TP for BUY), not close-vs-open.

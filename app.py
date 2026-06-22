@@ -666,8 +666,10 @@ def _base_direction(date_str):
     m = DATA['moon'].get(date_str)
     if not m:
         return None
+    _sc, _pc, _oc = signphase_counts(date_str, m['sign'])
     sig = engine.compute_signal(date_str, m, hist_counts(date_str, m['sign'], m['stage']),
-                                past_moon_history(date_str), price=None)
+                                past_moon_history(date_str), price=None,
+                                sign_counts=_sc, phase_counts=_pc, overall_counts=_oc)
     s = sig['signal'] if sig else ''
     return 'BUY' if 'BUY' in s else ('SELL' if 'SELL' in s else 'WAIT')
 
@@ -828,6 +830,38 @@ def hist_counts(date_str, sign, stage):
             elif p['direction'] == 'BEAR': bear += 1
     return {'bull': bull, 'bear': bear}
 
+def _phase_key(m):
+    """Normalise a moon-phase string to one of the 8 canonical phases."""
+    p = str((m or {}).get('phase', '')).lower()
+    for k in ('full moon', 'new moon', 'first quarter', 'last quarter', 'third quarter',
+              'waxing gibbous', 'waning gibbous', 'waxing crescent', 'waning crescent'):
+        if k in p:
+            return k
+    return p[:16]
+
+def signphase_counts(date_str, sign):
+    """Point-in-time bull/bear counts for the moon SIGN, the moon PHASE and OVERALL,
+    from price days STRICTLY BEFORE date_str. Feeds engine.compute_signal's sign+phase
+    direction rule (the one the spot-data study supports)."""
+    tgt_ph = _phase_key(DATA['moon'].get(date_str))
+    sc = {'bull': 0, 'bear': 0}; pc = {'bull': 0, 'bear': 0}; oc = {'bull': 0, 'bear': 0}
+    for d, p in DATA['prices'].items():
+        if d >= date_str:
+            continue
+        dirn = p.get('direction')
+        if dirn not in ('BULL', 'BEAR'):
+            continue
+        key = 'bull' if dirn == 'BULL' else 'bear'
+        oc[key] += 1
+        m = DATA['moon'].get(d)
+        if not m:
+            continue
+        if m['sign'] == sign:
+            sc[key] += 1
+        if _phase_key(m) == tgt_ph:
+            pc[key] += 1
+    return sc, pc, oc
+
 def past_moon_history(date_str):
     """All moon-day dicts strictly before date_str (for confidence calc)."""
     return [m for d, m in DATA['moon'].items() if d < date_str]
@@ -882,8 +916,10 @@ def _signed_move(date_str, today):
         else:
             m = DATA['moon'].get(date_str)
             if m:
+                _sc, _pc, _oc = signphase_counts(date_str, m['sign'])
                 sig = engine.compute_signal(date_str, m, hist_counts(date_str, m['sign'], m['stage']),
-                                            past_moon_history(date_str), price=None)
+                                            past_moon_history(date_str), price=None,
+                                            sign_counts=_sc, phase_counts=_pc, overall_counts=_oc)
                 s = sig['signal'] if sig else ''
                 mult = 1.4 if 'STRONG' in s else 1.0
                 mm = _matching_moves(date_str, m['sign'], m['stage'])
@@ -1385,9 +1421,11 @@ def build_day(date_str):
     if m:
         counts  = hist_counts(date_str, m['sign'], m['stage'])
         history = past_moon_history(date_str)
+        _sc, _pc, _oc = signphase_counts(date_str, m['sign'])
         # multi-timeframe price forecast only for today (intraday candles are "now")
         mtf = engine.mtf_score(DATA.get('h1'), DATA.get('h4')) if date_str == today else None
-        sig = engine.compute_signal(date_str, m, counts, history, price=p, mtf=mtf)
+        sig = engine.compute_signal(date_str, m, counts, history, price=p, mtf=mtf,
+                                    sign_counts=_sc, phase_counts=_pc, overall_counts=_oc)
 
         sign_info = DATA['signs'].get(m['sign'], {})
         phase_info = {}
