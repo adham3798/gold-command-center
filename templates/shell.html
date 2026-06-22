@@ -73,6 +73,9 @@
       <div class="tab" data-target="adham">
         <span class="ico">⚡</span><span>ADHAM Intraday</span>
       </div>
+      <div class="tab" data-target="scalp">
+        <span class="ico">⚔️</span><span>Scalp</span>
+      </div>
     </div>
     <div class="spacer"></div>
     <div class="hint">One server · localhost:5000 · switch views with the tabs</div>
@@ -82,6 +85,7 @@
     <iframe id="frame-gold"  class="active" src="/gold"  title="Moon Calendar &amp; Predictions"></iframe>
     <!-- Adham frame loads lazily on first click so its fetch loops don't start until viewed -->
     <iframe id="frame-adham" title="ADHAM Intraday"></iframe>
+    <iframe id="frame-scalp" title="Scalp"></iframe>
     <div class="loader" id="loader" style="display:none;">
       <div class="ring"></div><div>Loading ADHAM dashboard…</div>
     </div>
@@ -91,10 +95,12 @@
   var tabs   = document.querySelectorAll('.tab');
   var frames = {
     gold:  document.getElementById('frame-gold'),
-    adham: document.getElementById('frame-adham')
+    adham: document.getElementById('frame-adham'),
+    scalp: document.getElementById('frame-scalp')
   };
   var loader = document.getElementById('loader');
   var adhamLoaded = false;
+  var scalpLoaded = false;
 
   function show(target){
     tabs.forEach(function(t){ t.classList.toggle('active', t.dataset.target === target); });
@@ -108,6 +114,11 @@
         loader.style.opacity = '0';
         setTimeout(function(){ loader.style.display = 'none'; }, 400);
       }, { once:true });
+    }
+
+    if(target === 'scalp' && !scalpLoaded){
+      frames.scalp.src = '/static/scalp.html';
+      scalpLoaded = true;
     }
 
     Object.keys(frames).forEach(function(k){
