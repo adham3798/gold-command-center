@@ -7,11 +7,24 @@ Produces a daily directional signal from:
   - Transit    (retrogrades, eclipses, Full/New Moon, conjunctions, ingresses)
   - Day Number (1-9 numerology; 3, 6, 9 are the strongest "power" numbers)
   - History    (Moon Sign x Cycle Stage historical win-rate from local price data)
-  - Price      (layered only where OHLC exists: pivots / direction)
+  - Price      (layered only where OHLC exists: MTF structure / pivots)
 
-For FUTURE days (no price) the signal is astro + transit + day-number + history,
-weighted so the 3/6/9 power days carry the strongest conviction.
+For FUTURE days (no price) the signal is astro + transit + day-number + history.
 For PAST days we also know the realized Direction, so the caller can mark win/loss.
+
+------------------------------------------------------------------------------
+FIXES (vs original) — see CHANGES.md:
+  1. POWER_NUMBERS corrected to {3,6,9} to match the documented 3/6/9 rule
+     (was {3,7,9}); day_number_weight retuned so 6 is a power day, 7 is not.
+  2. Scoring is now NORMALISED: every component is scaled to [-1,1] first, then
+     blended with weights that always sum to 1.0, then * day multiplier. This
+     removes the old raw/25 saturation where STRONG signals fired far too easily.
+  3. NO LOOK-AHEAD: moon_score no longer takes the realized close direction.
+     The TREND bias now follows only price *structure* (MTF momentum), which is
+     known before the close — so a backtest of compute_signal can't see the answer.
+  4. MTF is folded INTO the weighted blend (weights re-normalised) instead of
+     being added on top, so price structure has a consistent, bounded influence.
+------------------------------------------------------------------------------
 """
 from datetime import datetime
 
@@ -85,7 +98,8 @@ SUN_DB = [
     {'e':'Sun enters Sagittarius','d':'11/22/2026'},{'e':'Sun enters Capricorn','d':'12/21/2026'},
 ]
 
-POWER_NUMBERS = {3, 7, 9}   # strongest day numbers (user rule)
+# FIX 1: power numbers are 3/6/9 (Tesla / ADHAM rule), matching the docs.
+POWER_NUMBERS = {3, 6, 9}
 
 
 # ───────────────────────── helpers ─────────────────────────
@@ -200,16 +214,22 @@ MOON_BEAR = ('Capricorn', 'Scorpio', 'Virgo')
 SUN_BULL  = ('Aries', 'Leo', 'Sagittarius')
 SUN_BEAR  = ('Capricorn', 'Scorpio', 'Virgo')
 
-def moon_score(sign, cycle_stage, direction=None):
-    """Moon sign score. `direction` (+1/-1) used for TREND bias when known (past days)."""
+def moon_score(sign, cycle_stage, struct_dir=None):
+    """Moon-sign score.
+
+    FIX 3: `struct_dir` is the price-STRUCTURE direction (+1/-1) from the MTF /
+    momentum read — NOT the realized close direction. It is known before the
+    close, so using it for the TREND bias does not leak the outcome into a
+    backtest. Pass None when no structure is available (pure astro forecast).
+    """
     z = ZODIAC_DB.get(sign, {})
     s = 0
     if sign in MOON_BULL:   s += 15
     elif sign in MOON_BEAR: s -= 15
     bias = z.get('bias')
     if bias == 'REVERSAL':  s -= 5
-    if bias == 'TREND' and direction == 1:  s += 8
-    if bias == 'TREND' and direction == -1: s -= 8
+    if bias == 'TREND' and struct_dir == 1:  s += 8
+    if bias == 'TREND' and struct_dir == -1: s -= 8
     if bias == 'SHARP MOVE': s += 5 if s >= 0 else -5
     if cycle_stage == 'FINISH':
         s *= 0.7
@@ -228,8 +248,9 @@ def sun_score(sun_sign):
     return s
 
 def day_number_weight(dn):
-    """Magnitude multiplier from the 1-9 day number. 3/7/9 are strongest (9>7>3)."""
-    table = {1:0.85, 2:0.90, 3:1.20, 4:0.85, 5:0.90, 6:0.90, 7:1.30, 8:0.85, 9:1.40}
+    """Magnitude multiplier from the 1-9 day number.
+    FIX 1: 3/6/9 are the strong "power" days (9>6>3); 7 is ordinary."""
+    table = {1:0.85, 2:0.90, 3:1.20, 4:0.85, 5:0.90, 6:1.30, 7:0.90, 8:0.85, 9:1.40}
     return table.get(dn, 1.0)
 
 # moon-phase reliability (for confidence) — keys normalised to lower-case
@@ -283,14 +304,26 @@ def signal_label(bias_pct):
     return 'NO TRADE', 'no-trade'
 
 
+# FIX 2/4: component normalisation constants (each raw component is divided by
+# its natural scale to land in roughly [-1,1] before the weighted blend).
+_NORM = {'hist': 30.0, 'moon': 23.0, 'transit': 30.0, 'sun': 23.0, 'mtf': 30.0}
+# blend weights — two sets, each summing to 1.0 (with vs without MTF price structure)
+_W_NO_MTF = {'hist': 0.40, 'moon': 0.30, 'transit': 0.18, 'sun': 0.12}
+_W_MTF    = {'hist': 0.30, 'moon': 0.24, 'transit': 0.14, 'sun': 0.10, 'mtf': 0.22}
+
+
 def compute_signal(date_str, moon, hist_counts, history, price=None, mtf=None):
     """
     Full ADHAM-style daily signal.
 
     moon        : dict for this date (sign, stage, stage_num, day_number, gender, phase, sun_sign)
     hist_counts : dict {'bull':int,'bear':int} from Moon-Sign x Cycle-Stage historical match
+                  (CALLER MUST build this from days STRICTLY BEFORE date_str — point-in-time)
     history     : list of past moon dicts (for confidence)
-    price       : optional dict (open,high,low,close,direction) — only for past/today
+    price       : optional dict (open,high,low,close,direction). NOTE: only the
+                  realized direction is *never* fed into the signal anymore (no leak).
+    mtf         : optional multi-timeframe structure score (-30..+30) from prior/forming
+                  candles. Used both as a forecast component and as the TREND-bias direction.
 
     Returns a dict with the signal, bias, all component scores and detail bars.
     """
@@ -301,16 +334,16 @@ def compute_signal(date_str, moon, hist_counts, history, price=None, mtf=None):
     dn    = moon.get('day_number')
     sun   = moon.get('sun_sign')
 
-    # realized direction (only meaningful for past days; used for TREND modifier + outcome)
-    direction = None
-    if price and price.get('direction') in ('BULL', 'BEAR'):
-        direction = 1 if price['direction'] == 'BULL' else -1
+    # FIX 3: TREND bias follows price STRUCTURE (mtf), never the realized close.
+    struct_dir = None
+    if mtf is not None:
+        struct_dir = 1 if mtf > 0 else (-1 if mtf < 0 else None)
 
-    mS = moon_score(sign, stage, direction)
+    mS = moon_score(sign, stage, struct_dir)
     sS = sun_score(sun)
     tScore, tSigs = score_transits(date_str)
 
-    # historical directional score from Moon x Stage win-rate
+    # historical directional score from Moon x Stage win-rate (point-in-time counts)
     bull, bear = hist_counts.get('bull', 0), hist_counts.get('bear', 0)
     total = bull + bear
     if total >= 2:
@@ -321,22 +354,24 @@ def compute_signal(date_str, moon, hist_counts, history, price=None, mtf=None):
         bull_pct = bear_pct = 0
         histScore = 0
 
-    # weighted raw bias (astro-dominant; this is the forecast brain for all days)
-    raw = histScore * 0.35 + mS * 0.30 + tScore * 0.20 + sS * 0.15
+    # FIX 2/4: normalise each component to ~[-1,1], then blend with weights that sum to 1.
+    nHist = _clamp(histScore / _NORM['hist'], -1, 1)
+    nMoon = _clamp(mS       / _NORM['moon'], -1, 1)
+    nTran = _clamp(tScore   / _NORM['transit'], -1, 1)
+    nSun  = _clamp(sS       / _NORM['sun'],  -1, 1)
 
-    # multi-timeframe price forecast (today only, when 1H/4H candles available)
-    mtf_val = None
     if mtf is not None:
-        mtf_val = mtf
-        raw += mtf * 0.30          # MTF price structure layered on top
+        nMtf = _clamp(mtf / _NORM['mtf'], -1, 1)
+        w = _W_MTF
+        blend = nHist*w['hist'] + nMoon*w['moon'] + nTran*w['transit'] + nSun*w['sun'] + nMtf*w['mtf']
+    else:
+        w = _W_NO_MTF
+        blend = nHist*w['hist'] + nMoon*w['moon'] + nTran*w['transit'] + nSun*w['sun']
 
-    # 3/6/9 power-day amplifier on magnitude
+    # 3/6/9 power-day amplifier on magnitude, then map [-1,1] -> [-100,100]
     dmult = day_number_weight(dn)
-    raw *= dmult
-
-    # normalise to -100..+100  (~25 raw = full scale)
-    bias_pct = round(_clamp(raw / 25 * 100, -100, 100), 1)
-    bias_raw = round(raw, 1)
+    bias_pct = round(_clamp(blend * dmult * 100, -100, 100), 1)
+    bias_raw = round(blend * dmult, 3)
 
     sig, key = signal_label(bias_pct)
 
@@ -355,7 +390,7 @@ def compute_signal(date_str, moon, hist_counts, history, price=None, mtf=None):
         'moon_score': round(mS, 1), 'sun_score': round(sS, 1),
         'transit_score': tScore, 'hist_score': round(histScore, 1),
         'day_number': dn, 'power_day': dn in POWER_NUMBERS, 'day_mult': dmult,
-        'mtf_score': mtf_val,
+        'mtf_score': mtf,
         'bull_pct': round(bull_pct, 1), 'bear_pct': round(bear_pct, 1), 'matches': total,
         'zodiac_bias': ZODIAC_DB.get(sign, {}).get('bias', ''),
         'sun_bias': ZODIAC_DB.get(sun, {}).get('bias', ''),
@@ -363,7 +398,6 @@ def compute_signal(date_str, moon, hist_counts, history, price=None, mtf=None):
         'transit_signals': tSigs,
         'transits_today': [t['e'] for t in transits_today],
     }
-    # NOTE: win/loss is decided in build_day using the take-profit model
-    # (did Low reach the downside TP for SELL / High reach upside TP for BUY),
-    # not close-vs-open — so it is not set here.
+    # win/loss is decided by the caller's take-profit model (did Low reach the
+    # downside TP for SELL / High reach upside TP for BUY), not close-vs-open.
     return out
