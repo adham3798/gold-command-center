@@ -3129,7 +3129,7 @@ GSR_MEAN, GSR_SD = 79.3, 13.4   # from 568-day backtest
 def _sv_struct(bars):
     """EMA9/21 + fast-EMA slope -> (dir -1/0/1, label, strength 0..1)."""
     cl = [b['close'] for b in bars if b.get('close') is not None]
-    if len(cl) < 22:
+    if len(cl) < 12:
         return 0, 'THIN', 0.0
     def _ema(v, p):
         k = 2.0 / (p + 1); e = [v[0]]
@@ -3163,7 +3163,7 @@ def api_silver():
            'gsr': None, 'gsr_z': None, 'action': 'Silver feed (XAG tabs) not found.'}
     g = _scalp_load_tab('XAU_15m') or _scalp_load_tab('XAU_5m')
     s = _scalp_load_tab('XAG_15m') or _scalp_load_tab('XAG_5m')
-    if len(g) < 22 or len(s) < 22:
+    if len(g) < 12 or len(s) < 12:
         return jsonify(out)
     # align on last-N by index (same cadence feed)
     n = min(len(g), len(s))
