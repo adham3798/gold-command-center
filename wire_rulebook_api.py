@@ -86,6 +86,48 @@ def _rb_news(et_today, now_utc):
     return out
 
 
+def _rb_guardrails(today):
+    """Today's discipline stats from the manual journal (trades.json). R is derived
+    from entry/sl/exit; the -1.5% day stop maps to -3R at 0.5% risk/trade.
+    Returns trade/loss counts, cumulative R, and a hard 'locked' flag + reason."""
+    out = {'trades': 0, 'losses': 0, 'wins': 0, 'day_r': 0.0, 'locked': False,
+           'reason': None, 'limits': {'max_losses': 3, 'max_trades': 5, 'min_day_r': -3.0}}
+    try:
+        if not os.path.exists(TRADES_FILE):
+            return out
+        with open(TRADES_FILE, encoding='utf-8') as f:
+            trades = json.load(f)
+        for t in trades:
+            if str(t.get('date')) != today:
+                continue
+            out['trades'] += 1
+            if str(t.get('status')) != 'closed':
+                continue
+            entry, sl, ex = t.get('entry'), t.get('sl'), t.get('exit')
+            if entry is None or ex is None:
+                continue
+            d = str(t.get('direction', '')).upper()
+            profit = (ex - entry) if ('BUY' in d or 'LONG' in d) else (entry - ex)
+            risk = abs(entry - sl) if sl is not None else None
+            r = (profit / risk) if risk else (1.0 if profit > 0 else (-1.0 if profit < 0 else 0.0))
+            out['day_r'] += r
+            if r < 0:
+                out['losses'] += 1
+            elif r > 0:
+                out['wins'] += 1
+        out['day_r'] = round(out['day_r'], 2)
+        L = out['limits']
+        if out['losses'] >= L['max_losses']:
+            out['locked'] = True; out['reason'] = '%d losing trades (limit %d)' % (out['losses'], L['max_losses'])
+        elif out['day_r'] <= L['min_day_r']:
+            out['locked'] = True; out['reason'] = 'Day at %.1fR (stop at %.0fR / -1.5%%)' % (out['day_r'], L['min_day_r'])
+        elif out['trades'] >= L['max_trades']:
+            out['locked'] = True; out['reason'] = '%d trades taken (max %d/session)' % (out['trades'], L['max_trades'])
+    except Exception:
+        pass
+    return out
+
+
 @app.route('/api/rulebook')
 def api_rulebook():
     out = {'status': 'ok'}
@@ -107,6 +149,9 @@ def api_rulebook():
         else:
             bias = 'NEUTRAL'
         market_closed = bool(day.get('market_closed'))
+
+        # ── daily guardrails from the journal ──
+        guard = _rb_guardrails(today)
 
         # ── live price (spot) with sheet fallback ──
         price = None
@@ -161,9 +206,11 @@ def api_rulebook():
         score = s_level + s_bias + s_sess + s_mtf + s_astro
         grade = 'A' if score >= 6 else ('B' if score >= 4 else 'C')
 
-        # ── verdict ──
+        # ── verdict (hard gates first: closed → guardrail lock → news → grade) ──
         if market_closed:
             verdict = {'state': 'STAND DOWN', 'reason': 'Market closed (%s)' % (day.get('closed_reason') or 'weekend/holiday')}
+        elif guard['locked']:
+            verdict = {'state': 'STAND DOWN', 'reason': 'Daily guardrail hit — %s' % guard['reason']}
         elif news_block['blackout']:
             verdict = {'state': 'STAND DOWN', 'reason': 'High-impact news blackout (±15 min)'}
         elif grade == 'A':
@@ -180,6 +227,7 @@ def api_rulebook():
             'market_closed': market_closed,
             'price': round(price, 2) if price else None,
             'level': level, 'session': sess, 'news': news_block, 'astro': astro,
+            'guardrails': guard,
             'gate': {'score': score, 'max': 8, 'grade': grade, 'breakdown': bd},
             'verdict': verdict,
         })

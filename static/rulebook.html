@@ -94,6 +94,22 @@
   .pill.amber{color:var(--amber); border-color:var(--amber);}
   .foot{font-size:11px; color:var(--dim); text-align:center; margin-top:6px; line-height:1.5;}
   .price-big{font-size:22px; font-weight:800; color:var(--gold);}
+  /* guardrails */
+  .gstat{min-width:140px; background:var(--bg2); border:1px solid var(--border);
+    border-radius:10px; padding:12px 14px;}
+  .gk{font-size:11px; color:var(--dim); letter-spacing:1px; text-transform:uppercase;}
+  .gv{font-size:22px; font-weight:800; color:#fff; margin:3px 0 8px;}
+  .gv small{font-size:12px; color:var(--dim); font-weight:600;}
+  .bar{height:6px; background:var(--border); border-radius:6px; overflow:hidden;}
+  .bar i{display:block; height:100%; width:0%; background:var(--green); transition:width .4s ease;}
+  .bar i.red{background:var(--amber);}
+  .bar i.hot{background:var(--red);}
+  .gsmall{font-size:11px; color:var(--dim); margin-top:6px;}
+  #guard-card.locked{border-color:var(--red);
+    background:linear-gradient(90deg,rgba(255,34,68,.10),rgba(13,21,37,.5));
+    animation:pulse 1.6s ease-in-out infinite;}
+  .pill.lock{color:var(--red); border-color:var(--red);}
+  .pill.ok{color:var(--green); border-color:var(--green);}
   .upd{font-size:11px; color:var(--dim); text-align:right; margin-bottom:8px;}
   a{color:var(--blue);}
 </style>
@@ -152,6 +168,21 @@
         </div>
         <ul class="evlist" id="evlist"></ul>
       </div>
+    </div>
+  </div>
+
+  <!-- GUARDRAILS -->
+  <div class="card" id="guard-card">
+    <h2>🛡 Daily Guardrails <span id="guard-lock" class="pill" style="margin-left:8px;">—</span></h2>
+    <div class="row" style="gap:12px;">
+      <div class="col gstat"><div class="gk">Trades</div><div class="gv" id="g-trades">0 <small>/ 5</small></div>
+        <div class="bar"><i id="g-trades-bar"></i></div></div>
+      <div class="col gstat"><div class="gk">Losses</div><div class="gv" id="g-losses">0 <small>/ 3</small></div>
+        <div class="bar"><i id="g-losses-bar" class="red"></i></div></div>
+      <div class="col gstat"><div class="gk">Day R</div><div class="gv" id="g-dayr">0.0R <small>/ −3R</small></div>
+        <div class="bar"><i id="g-dayr-bar" class="red"></i></div></div>
+      <div class="col gstat"><div class="gk">Record</div><div class="gv"><span id="g-wins" style="color:var(--green)">0W</span> · <span id="g-losses2" style="color:var(--red)">0L</span></div>
+        <div class="gsmall">−1.5% day ≈ −3R at 0.5%/trade</div></div>
     </div>
   </div>
 
@@ -292,6 +323,25 @@ async function load(){
     document.getElementById('a-dn').textContent = a.day_number!=null? a.day_number : '—';
     pill('a-power', a.power?'power 3·6·9':'—', a.power?'amber':'');
     pill('a-watch', a.watch?'watch window':'no flag', a.watch?'amber':'');
+
+    // guardrails
+    var gr = d.guardrails || {trades:0,losses:0,wins:0,day_r:0,locked:false,limits:{max_trades:5,max_losses:3,min_day_r:-3}};
+    var L = gr.limits || {max_trades:5,max_losses:3,min_day_r:-3};
+    document.getElementById('g-trades').innerHTML = gr.trades+' <small>/ '+L.max_trades+'</small>';
+    document.getElementById('g-losses').innerHTML = gr.losses+' <small>/ '+L.max_losses+'</small>';
+    document.getElementById('g-dayr').innerHTML = (gr.day_r>0?'+':'')+gr.day_r+'R <small>/ −3R</small>';
+    document.getElementById('g-wins').textContent = gr.wins+'W';
+    document.getElementById('g-losses2').textContent = gr.losses+'L';
+    function setbar(id, frac, hotAt){
+      var e=document.getElementById(id); var pct=Math.max(0,Math.min(1,frac))*100;
+      e.style.width=pct+'%'; e.classList.toggle('hot', frac>=hotAt);
+    }
+    setbar('g-trades-bar', gr.trades/L.max_trades, 1);
+    setbar('g-losses-bar', gr.losses/L.max_losses, 1);
+    setbar('g-dayr-bar', gr.day_r<0 ? Math.abs(gr.day_r)/Math.abs(L.min_day_r) : 0, 1);
+    document.getElementById('guard-card').classList.toggle('locked', !!gr.locked);
+    pill('guard-lock', gr.locked? ('LOCKED — '+(gr.reason||'limit hit')) : 'active · within limits',
+         gr.locked?'lock':'ok');
 
     // bias & level
     pill('b-bias', d.bias, d.bias==='LONG'?'long':(d.bias==='SHORT'?'short':''));

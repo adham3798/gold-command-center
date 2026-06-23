@@ -60,6 +60,7 @@
     </label>
     <span id="livesrc" style="color:var(--dim)"></span>
   </div>
+    <div id="silver-badge" style="margin:8px 0;padding:8px 12px;border-radius:8px;font:13px/1.4 system-ui;background:#1c1c1e;color:#eee;display:none"></div>
   <div class="grid">
     <div>
       <div class="card">
@@ -223,6 +224,23 @@ document.querySelectorAll("input,select").forEach(el=>{el.addEventListener("inpu
 $("liveon").addEventListener("change",fetchLive);
 load();build();fetchLive();
 setInterval(fetchLive,45000);
+</script>
+<script>
+(function(){
+ var C={CONFIRM:'#1f9d55','IN-SYNC':'#1f9d55','CHOP-TIEBREAK':'#b58900',
+   UNCONFIRMED:'#666',NEUTRAL:'#666',DIVERGING:'#b58900',
+   'DIVERGENCE-VETO':'#c0392b',DECOUPLED:'#7d3c98'};
+ function load(){fetch('/api/silver').then(function(r){return r.json();}).then(function(d){
+   var el=document.getElementById('silver-badge');
+   if(!d||!d.ok){el.style.display='none';return;}
+   el.style.display='block';
+   el.style.borderLeft='4px solid '+(C[d.verdict]||'#666');
+   el.innerHTML='<b>SILVER '+d.verdict+'</b> &middot; corr '+d.corr+' ('+d.regime+
+     ') &middot; gold '+d.gold_structure+' / silver '+d.silver_structure+
+     '<br>'+d.action+(d.gsr_note?'<br><i>'+d.gsr_note+'</i>':'');
+ }).catch(function(){});}
+ load(); setInterval(load,60000);
+})();
 </script>
 </body>
 </html>
