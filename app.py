@@ -111,8 +111,8 @@ _H1_SORTED = []
 _H1_BY_DAY = {}
 
 def _sheet_csv(tab):
-    return 'https://docs.google.com/spreadsheets/d/%s/gviz/tq?tqx=out:csv&sheet=%s' % (
-        SHEET_ID, urllib.parse.quote(tab))
+    return 'https://docs.google.com/spreadsheets/d/%s/gviz/tq?tqx=out:csv&sheet=%s&cb=%d' % (
+        SHEET_ID, urllib.parse.quote(tab), int(__import__('time').time()//60))
 
 def _read_tab(tab):
     return pd.read_csv(_sheet_csv(tab))
@@ -3161,8 +3161,14 @@ def api_silver():
     out = {'ok': False, 'verdict': 'NO-DATA', 'corr': None, 'regime': None,
            'gold_structure': None, 'silver_structure': None,
            'gsr': None, 'gsr_z': None, 'action': 'Silver feed (XAG tabs) not found.'}
-    g = _scalp_load_tab('XAU_15m') or _scalp_load_tab('XAU_5m')
-    s = _scalp_load_tab('XAG_15m') or _scalp_load_tab('XAG_5m')
+    _g5 = _scalp_load_tab('XAU_5m'); _s5 = _scalp_load_tab('XAG_5m')
+    _g15 = _scalp_load_tab('XAU_15m'); _s15 = _scalp_load_tab('XAG_15m')
+    if len(_g5) >= 12 and len(_s5) >= 12:
+        g, s = _g5, _s5
+    elif len(_g15) >= 12 and len(_s15) >= 12:
+        g, s = _g15, _s15
+    else:
+        g, s = (_g15 or _g5), (_s15 or _s5)
     if len(g) < 12 or len(s) < 12:
         return jsonify(out)
     # align on last-N by index (same cadence feed)
