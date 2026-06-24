@@ -3216,14 +3216,3 @@ def api_silver():
                 'gsr_note': gsr_note, 'action': action})
     return jsonify(out)
 # ── END SILVER CROSS-CHECK API ─────────────────────────────────────────────────
-
-
-# === GOLD TELEGRAM BOT (idempotent) ===
-try:
-    from telegram_bot import register_telegram_bot
-    register_telegram_bot(app)
-    print("[telegram_bot] registered: /telegram/webhook, /telegram/tick, /telegram/health")
-except Exception as _tg_e:  # never crash the app if the bot fails to load
-    import logging
-    logging.exception("telegram bot init failed: %s", _tg_e)
-# === END GOLD TELEGRAM BOT ===
