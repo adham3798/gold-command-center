@@ -142,11 +142,21 @@ def fetch_context():
     ctx = {}
     for key, path in (("rulebook", "/api/rulebook"),
                       ("scalp", "/api/scalp"),
-                      ("price", "/api/live-price")):
+                      ("price", "/api/live-price"),
+                      ("trends", "/api/trends"),
+                      ("silver", "/api/silver")):
         try:
             ctx[key] = _http_json(BASE_URL + path, timeout=20)
         except Exception as e:
             ctx[key] = {"error": str(e)}
+    # /api/dashboard is large (10+ days) — keep only today's object + session header
+    try:
+        dash = _http_json(BASE_URL + "/api/dashboard", timeout=25)
+        ctx["today"] = dash.get("today", {}) or {}
+        ctx["session_plan"] = dash.get("session", {}) or {}
+    except Exception as e:
+        ctx["today"] = {"error": str(e)}
+        ctx["session_plan"] = {}
     return ctx
 
 
@@ -155,6 +165,9 @@ def context_summary(ctx):
     rb = ctx.get("rulebook", {}) or {}
     sc = ctx.get("scalp", {}) or {}
     pr = ctx.get("price", {}) or {}
+    tr = ctx.get("trends", {}) or {}
+    td = ctx.get("today", {}) or {}
+    sv = ctx.get("silver", {}) or {}
     lvl = rb.get("level", {}) or {}
     gate = rb.get("gate", {}) or {}
     verd = rb.get("verdict", {}) or {}
@@ -191,6 +204,58 @@ def context_summary(ctx):
             astro.get("phase"), astro.get("day_number"),
             astro.get("power"), astro.get("watch")),
     ]
+
+    # ---- Multi-timeframe trend (from /api/trends) ----
+    def _tf(o):
+        o = o or {}
+        return "%s (last %s, %s/%s bars bull, net %s)" % (
+            o.get("dir"), o.get("last"), o.get("bull"), o.get("bars"), o.get("net"))
+    rev = tr.get("reversal", {}) or {}
+    if tr:
+        lines += [
+            "",
+            "MULTI-TIMEFRAME TREND:",
+            "  Daily: %s" % _tf(tr.get("daily")),
+            "  H4:    %s%s" % (_tf(tr.get("h4")), " [STALE]" if tr.get("h4_stale") else ""),
+            "  H1:    %s%s" % (_tf(tr.get("h1")), " [STALE]" if tr.get("h1_stale") else ""),
+            "  Reversal state: %s — %s" % (rev.get("label"), rev.get("detail")),
+        ]
+
+    # ---- Today's model + 4H plan + news (from /api/dashboard 'today') ----
+    if td and not td.get("error"):
+        p4 = td.get("plan4h", {}) or {}
+        news_list = td.get("usd_news") or []
+        news_txt = "none scheduled" if not news_list else "; ".join(
+            (str(n) if not isinstance(n, dict)
+             else "%s %s (%s)" % (n.get("time", ""), n.get("title", n.get("event", "")),
+                                  n.get("impact", ""))).strip()
+            for n in news_list)
+        lines += [
+            "",
+            "TODAY'S MODEL (astro+MTF engine):",
+            "  Signal %s | dir %s | trend_regime %s | mtf_label %s" % (
+                td.get("signal"), td.get("dir"), td.get("trend_regime"), td.get("mtf_label")),
+            "  Expected move %s / range %s | confidence %s%% | with_trend=%s" % (
+                td.get("expected_move"), td.get("expected_range"),
+                td.get("confidence"), td.get("with_trend")),
+            "  wait_4h=%s%s" % (
+                td.get("wait_4h"),
+                (" — " + td.get("wait_4h_msg", "")) if td.get("wait_4h") else ""),
+            "  4H PLAN: %s %s | entry %s (%s) | stop %s | target %s" % (
+                p4.get("dir"), (p4.get("advice") or "").split(" — ")[0],
+                p4.get("entry"), p4.get("entry_label"),
+                p4.get("stop"), p4.get("target")),
+            "  4H advice: %s" % p4.get("advice"),
+            "  USD news today (%s): %s" % (td.get("usd_news_count", 0), news_txt),
+        ]
+
+    # ---- Silver cross-check ----
+    if sv and not sv.get("error"):
+        lines.append("")
+        lines.append("Silver cross-check: regime=%s, corr=%s (%s)" % (
+            sv.get("regime") or sv.get("verdict"), sv.get("corr") or sv.get("correlation"),
+            sv.get("note", "")))
+
     return "\n".join(lines)
 
 
@@ -210,6 +275,13 @@ Rules of engagement:
 - Be concise and direct. Lead with the answer, then the reason. No fluff.
 - You give information and structured reasoning, NOT licensed financial advice;
   the final decision and risk is always Adham's.
+
+For TREND questions, use the MULTI-TIMEFRAME TREND block (Daily / H4 / H1 direction +
+the reversal-state readout) plus the 5m/15m scalp feed when present. State the alignment
+plainly (e.g. "Daily down, H4 down, H1 up — pullback, no reversal confirmed yet"), then
+what it means for entries. Honor the wait_4h flag: if the daily signal needs the 4-hour to
+confirm and it hasn't, say wait. If a timeframe is marked STALE or the 5m/15m feed is null,
+note the data is missing rather than guessing.
 
 Trading framework (the rulebook this dashboard implements):
 - Confluence gate scored 0-8 -> grade A (>=6), B (4-5), C (<4). Only A-grade
@@ -277,6 +349,7 @@ Just type a question and I'll answer from the live dashboard, e.g.
 
 Commands:
   /today    quick live snapshot (bias, verdict, gate, price)
+  /trend    multi-timeframe trend (Daily/H4/H1) + reversal state + 4H plan
   /levels   today's pivots + day high/low
   /log ...  log a trade or note  (e.g. /log long 4120, +1.5R, news spike)
   /week ... save your weekly outlook  (referenced all week)
@@ -300,6 +373,26 @@ def cmd_levels(ctx):
                 lvl.get("dist_pct"), sc.get("pdh"), sc.get("pdl"),
                 sc.get("pdc"), sc.get("orl"), sc.get("orh"),
                 sc.get("vwap"), sc.get("ema21")))
+
+
+def cmd_trend(ctx):
+    tr = ctx.get("trends", {}) or {}
+    td = ctx.get("today", {}) or {}
+    rev = tr.get("reversal", {}) or {}
+    p4 = td.get("plan4h", {}) or {}
+
+    def _tf(o):
+        o = o or {}
+        return "%s (last %s, %s/%s bars bull)" % (
+            o.get("dir"), o.get("last"), o.get("bull"), o.get("bars"))
+    return ("MULTI-TIMEFRAME TREND\n"
+            "Daily: %s\nH4:    %s\nH1:    %s\n"
+            "State: %s — %s\n\n"
+            "4H plan: %s entry %s, stop %s, target %s\n%s" % (
+                _tf(tr.get("daily")), _tf(tr.get("h4")), _tf(tr.get("h1")),
+                rev.get("label"), rev.get("detail"),
+                p4.get("dir"), p4.get("entry"), p4.get("stop"), p4.get("target"),
+                p4.get("advice", "")))
 
 
 def cmd_log(text):
@@ -365,6 +458,9 @@ def handle_message(chat_id, text):
         return
     if low.startswith("/levels"):
         tg_send(cmd_levels(ctx), chat_id)
+        return
+    if low.startswith("/trend"):
+        tg_send(cmd_trend(ctx), chat_id)
         return
 
     # Free-form question -> AI
