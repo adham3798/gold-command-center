@@ -60,7 +60,7 @@ OWNER_CHAT = str(os.environ.get("TELEGRAM_CHAT_ID", "")).strip()
 AI_KEY     = os.environ.get("ANTHROPIC_API_KEY", "")
 HOOK       = os.environ.get("BOT_WEBHOOK_SECRET", "hook")
 TICK_KEY   = os.environ.get("TICK_KEY", "tick")
-BASE_URL   = os.environ.get("BASE_URL", "https://gold-command-center-production.up.railway.app").rstrip("/")
+BASE_URL   = os.environ.get("BASE_URL", "https://web-production-44c32.up.railway.app").rstrip("/")
 MODEL      = os.environ.get("BOT_MODEL", "claude-sonnet-4-6")
 TZNAME     = os.environ.get("BOT_TZ", "Asia/Dubai")
 
@@ -87,6 +87,11 @@ HEARTBEAT_EVERY_H = int(os.environ.get("HEARTBEAT_EVERY_H", "1"))   # send a hea
 LIVE_ALERTS_ON    = os.environ.get("LIVE_ALERTS_ON", "1") not in ("0", "false", "False", "")
 QUIET_START_H     = int(os.environ.get("QUIET_START_H", "-1"))      # optional quiet window start hour (local), -1 = off
 QUIET_END_H       = int(os.environ.get("QUIET_END_H", "-1"))        # optional quiet window end hour (local)
+
+# Internal self-ticker: because the Railway service never sleeps, the bot can drive its
+# own tick loop from a background thread — no external pinger (UptimeRobot/cron) required.
+INTERNAL_TICK         = os.environ.get("INTERNAL_TICK", "1") not in ("0", "false", "False", "")
+INTERNAL_TICK_SECONDS = max(60, int(os.environ.get("INTERNAL_TICK_SECONDS", "300")))  # default every 5 min
 
 
 # --------------------------------------------------------------------------
@@ -835,6 +840,32 @@ def run_tick():
 
 
 # --------------------------------------------------------------------------
+# Internal self-ticker (Railway never sleeps -> no external pinger needed)
+# --------------------------------------------------------------------------
+def _internal_ticker():
+    """Background loop that calls run_tick() on a fixed interval. Runs forever in a
+    daemon thread inside the (single) gunicorn worker. Idempotent dedupe in run_tick
+    means it's safe even if an external pinger also hits /telegram/tick."""
+    time.sleep(20)  # let the app finish booting before the first self-tick
+    while True:
+        try:
+            run_tick()
+        except Exception:
+            pass
+        time.sleep(INTERNAL_TICK_SECONDS)
+
+
+def start_internal_ticker(app):
+    """Start the self-ticker exactly once per process."""
+    if not INTERNAL_TICK:
+        return
+    if getattr(app, "_gold_ticker_started", False):
+        return
+    app._gold_ticker_started = True
+    threading.Thread(target=_internal_ticker, daemon=True).start()
+
+
+# --------------------------------------------------------------------------
 # Registration — call register_telegram_bot(app) from app.py
 # --------------------------------------------------------------------------
 def register_telegram_bot(app):
@@ -875,6 +906,12 @@ def register_telegram_bot(app):
             model=MODEL,
             base_url=BASE_URL,
             tz=TZNAME,
+            internal_tick=INTERNAL_TICK,
+            internal_tick_seconds=INTERNAL_TICK_SECONDS,
         )
+
+    # Start the self-ticker so the bot drives its own hourly/4H/movement/level alerts
+    # without any external pinger (Railway keeps the process alive 24/7).
+    start_internal_ticker(app)
 
     return app
