@@ -88,6 +88,16 @@ LIVE_ALERTS_ON    = os.environ.get("LIVE_ALERTS_ON", "1") not in ("0", "false", 
 QUIET_START_H     = int(os.environ.get("QUIET_START_H", "-1"))      # optional quiet window start hour (local), -1 = off
 QUIET_END_H       = int(os.environ.get("QUIET_END_H", "-1"))        # optional quiet window end hour (local)
 
+# Gold's standard 4H candle closes are 01/05/09/13/17/21 GMT, which in Asia/Dubai (GMT+4)
+# = 05:00, 09:00, 13:00, 17:00, 21:00, 01:00 -> local hours 1,5,9,13,17,21. These are the
+# hours (in BOT_TZ) at which the 🕓 4H-close update is sent. Override via FOUR_H_CLOSE_HOURS.
+try:
+    FOUR_H_CLOSE_HOURS = sorted({int(x) % 24 for x in
+                                 os.environ.get("FOUR_H_CLOSE_HOURS", "1,5,9,13,17,21").split(",")
+                                 if x.strip() != ""})
+except Exception:
+    FOUR_H_CLOSE_HOURS = [1, 5, 9, 13, 17, 21]
+
 # Internal self-ticker: because the Railway service never sleeps, the bot can drive its
 # own tick loop from a background thread — no external pinger (UptimeRobot/cron) required.
 INTERNAL_TICK         = os.environ.get("INTERNAL_TICK", "1") not in ("0", "false", "False", "")
@@ -763,10 +773,10 @@ def run_live_alerts(ctx, state, now, sent):
             state["live.last_alert_price"] = price_now
             sent.append("move")
 
-    # ---- 3) 4H candle close -----------------------------------------------
-    block4 = "%s:%d" % (now.strftime("%Y-%m-%d"), hh // 4)
+    # ---- 3) 4H candle close (gold's real closes: 1/5/9/13/17/21 Dubai) ----
+    block4 = "%s:4h%d" % (now.strftime("%Y-%m-%d"), hh)
     posted_4h = False
-    if hh % 4 == 0 and state.get("live.last_4h") != block4 and not market_closed:
+    if hh in FOUR_H_CLOSE_HOURS and state.get("live.last_4h") != block4 and not market_closed:
         tg_send("🕓 4H update — %s\n%s%s" % (
             now.strftime("%H:%M %Z"), _live_line(ctx), _four_h_block(ctx)))
         state["live.last_4h"] = block4
