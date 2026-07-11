@@ -40,9 +40,13 @@ Optional:
 import os
 import json
 import time
+import csv
+import io
+import re
 import threading
 import urllib.request
 import urllib.error
+import urllib.parse
 import datetime as _dt
 
 try:
@@ -102,6 +106,21 @@ except Exception:
 # own tick loop from a background thread — no external pinger (UptimeRobot/cron) required.
 INTERNAL_TICK         = os.environ.get("INTERNAL_TICK", "1") not in ("0", "false", "False", "")
 INTERNAL_TICK_SECONDS = max(60, int(os.environ.get("INTERNAL_TICK_SECONDS", "300")))  # default every 5 min
+
+# ---- Gold & Astro Weekly Tracker (Google Sheet) — Section 3 & 4 alerts ----
+# Reads the weekly tracker sheet (public "anyone with link -> viewer") via the same gviz
+# CSV method the dashboard already uses. Section 3 = planetary transits, Section 4 =
+# economic calendar. Fires a heads-up before each timed event, a daily agenda, and a
+# Monday week-ahead summary.
+TRACKER_SHEET_ID = os.environ.get("TRACKER_SHEET_ID", "13WdYpiBW9gJxJyN5mlq8oYM4M9XR0tMFz3ZFm9RXwjs")
+TRACKER_TAB      = os.environ.get("TRACKER_TAB", "").strip()   # blank = auto-detect current week
+SHEET_ALERTS_ON  = os.environ.get("SHEET_ALERTS_ON", "1") not in ("0", "false", "False", "")
+CAL_LEAD_MIN     = int(os.environ.get("CAL_LEAD_MIN", "15"))   # minutes before each event to ping
+CAL_AGENDA_HOUR  = int(os.environ.get("CAL_AGENDA_HOUR", "7")) # local hour for the daily agenda
+CAL_WEEKLY_HOUR  = int(os.environ.get("CAL_WEEKLY_HOUR", "3")) # Monday local hour for week-ahead
+CAL_REFRESH_SEC  = int(os.environ.get("CAL_REFRESH_SEC", "3600"))  # re-pull sheet at most this often
+_MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun",
+           "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
 
 
 # --------------------------------------------------------------------------
@@ -329,6 +348,19 @@ def context_summary(ctx):
             sv.get("regime") or sv.get("verdict"), sv.get("corr") or sv.get("correlation"),
             sv.get("note", "")))
 
+    # ---- Today's tracker events (Section 3 transits + Section 4 econ) ----
+    try:
+        cal = get_calendar(_now())
+        todays = [e for e in (cal["astro"] + cal["econ"]) if _is_today(e["date"], _now())]
+        todays.sort(key=_time_key)
+        if todays:
+            lines.append("")
+            lines.append("TODAY'S TRACKER (Sec 3 & 4) — %s:" % (cal.get("tab") or ""))
+            for e in todays:
+                lines.append("  " + _fmt_event(e))
+    except Exception:
+        pass
+
     return "\n".join(lines)
 
 
@@ -378,6 +410,16 @@ Trading framework (the rulebook this dashboard implements):
 If the user logs a trade or shares a weekly view, acknowledge briefly and tell them
 it's saved. Use their stored WEEKLY OUTLOOK as standing context for the week.
 
+WEEKLY GOLD & ASTRO TRACKER: You are given the current week's tracker sheet below (under
+"THIS WEEK'S GOLD & ASTRO TRACKER"). It is Adham's own weekly database and updates every
+week (a new tab is added each week; you always get the current one). It contains the daily
+snapshot, position-sizing guide, moon phases, planetary positions, the key planetary
+transits (Section 3) and the economic calendar (Section 4) — all in Dubai time. When Adham
+asks about astrology, moon phase, planetary transits/positions, critical degrees, economic
+events, or "what's on today/this week", ANSWER FROM THIS TRACKER — quote the specific dates,
+Dubai times, aspects and events. Combine it with the live price/trend snapshot for a full
+read. If the tracker is missing or a detail isn't in it, say so rather than inventing.
+
 MEMORY & LEARNING: You are given STANDING LESSONS and a RECENT TRADE JOURNAL below when
 available. Treat the STANDING LESSONS as hard rules Adham has taught you — always apply
 them and mention when one is relevant. Use the TRADE JOURNAL to learn from what has and
@@ -419,8 +461,17 @@ def ask_ai(question, ctx, history, weekly):
                 lines.append("- %s" % t)
         trades_txt = "\n".join(lines)
 
+    # This week's Gold & Astro Tracker sheet = the bot's weekly "database" (auto-follows
+    # whichever weekly tab is current). Grounds astro / transit / news / econ answers.
+    tracker_txt = ""
+    try:
+        tracker_txt = ("\n\n=== THIS WEEK'S GOLD & ASTRO TRACKER (live from your sheet) ===\n"
+                       + tracker_context_text(_now()))
+    except Exception:
+        tracker_txt = ""
+
     sys = (SYSTEM_PROMPT + "\n\n=== LIVE SNAPSHOT ===\n" + snap
-           + weekly_txt + lessons_txt + trades_txt)
+           + weekly_txt + lessons_txt + trades_txt + tracker_txt)
 
     messages = []
     for turn in history[-MAX_HISTORY:]:
@@ -471,6 +522,8 @@ Commands:
   /weekshow show your current weekly outlook
   /learn ... teach me a standing rule I apply forever (e.g. /learn skip Asia session)
   /lessons  show every standing rule you've taught me
+  /events   today's Section 3 (transits) + Section 4 (economic) events
+  /calendar the whole week ahead from your Gold & Astro Tracker sheet
   /help     this message
 
 I also watch the market for you and push alerts on my own:
@@ -478,10 +531,13 @@ I also watch the market for you and push alerts on my own:
   🕓 a fuller update at each 4H candle close (structure + 4H plan)
   📈 a MOVE alert whenever gold jumps more than $%d since the last report
   🎯 a LEVEL alert the moment price reaches a support/resistance pivot
-(plus morning brief, London-NY overlap, news blackout & guardrail lock).
+  ⏰ a heads-up ~%d min before every Section 3 transit & Section 4 econ event
+  🗓️ a daily agenda each morning + a week-ahead summary every Monday
+(plus morning brief, London-NY overlap, news blackout & guardrail lock).""" % (
+    int(ALERT_MOVE_USD), CAL_LEAD_MIN) + """
 
 I remember our full history, your trade journal, and your lessons — all saved
-durably, so I keep learning from them.""" % int(ALERT_MOVE_USD)
+durably, so I keep learning from them."""
 
 
 def cmd_today(ctx):
@@ -618,6 +674,12 @@ def handle_message(chat_id, text):
     if low.startswith("/lessons"):
         tg_send(cmd_lessons(), chat_id)
         return
+    if low.startswith("/events") or low.startswith("/today-events"):
+        tg_send(daily_agenda_text(get_calendar(_now(), force=True), _now()), chat_id)
+        return
+    if low.startswith("/calendar") or low.startswith("/week-events") or low.startswith("/astro"):
+        tg_send(weekly_summary_text(get_calendar(_now(), force=True), _now()), chat_id)
+        return
 
     # Everything below needs live context
     ctx = fetch_context()
@@ -645,6 +707,224 @@ def handle_message(chat_id, text):
     _append_archive("user", text)
     _append_archive("assistant", answer)
     tg_send(answer, chat_id)
+
+
+# --------------------------------------------------------------------------
+# Gold & Astro Weekly Tracker — Section 3 (transits) & Section 4 (econ calendar)
+# --------------------------------------------------------------------------
+_cal_cache = {"ts": 0.0, "tab": None, "astro": [], "econ": [], "rows": []}
+
+
+def _current_week_tab(now):
+    """Tab name for the current week, matching the sheet's 'Week Jun29-Jul3' style."""
+    monday = now.date() - _dt.timedelta(days=now.weekday())
+    friday = monday + _dt.timedelta(days=4)
+    fmt = lambda d: "%s%d" % (d.strftime("%b"), d.day)
+    return "Week %s-%s" % (fmt(monday), fmt(friday))
+
+
+def _gviz_csv(sheet_name=None, gid=None):
+    url = "https://docs.google.com/spreadsheets/d/%s/gviz/tq?tqx=out:csv" % TRACKER_SHEET_ID
+    if sheet_name:
+        url += "&sheet=" + urllib.parse.quote(sheet_name)
+    if gid is not None:
+        url += "&gid=%s" % gid
+    url += "&cb=%d" % int(time.time() // 60)
+    req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0 (GoldOS bot)"})
+    with urllib.request.urlopen(req, timeout=20) as resp:
+        return resp.read().decode("utf-8", "replace")
+
+
+def _cell(r, i):
+    return (r[i].strip() if len(r) > i and r[i] is not None else "")
+
+
+def _parse_events(csv_text):
+    """Split the sheet into Section 3 (astro) and Section 4 (econ) event rows."""
+    astro, econ = [], []
+    mode = None
+    for r in csv.reader(io.StringIO(csv_text)):
+        a, b, c, d, e = (_cell(r, 0), _cell(r, 1), _cell(r, 2), _cell(r, 3), _cell(r, 4))
+        ua = a.upper()
+        if ua.startswith("SECTION 3"):
+            mode = "astro"; continue
+        if ua.startswith("SECTION 4"):
+            mode = "econ"; continue
+        if ua.startswith("SECTION "):
+            mode = None; continue
+        if mode is None:
+            continue
+        if a.lower() == "date" or b.lower().startswith("time"):
+            continue                      # column-header row
+        if a.startswith("---"):
+            continue                      # day separator
+        if not c:
+            continue                      # nothing meaningful
+        if mode == "astro":
+            astro.append({"kind": "astro", "date": a, "time": b, "title": c,
+                          "meta": " · ".join(x for x in (d, e) if x)})
+        else:
+            econ.append({"kind": "econ", "date": a, "time": b, "title": c,
+                         "cur": d, "impact": e})
+    return astro, econ
+
+
+def _event_dt(date_label, time_label, now):
+    """Build a Dubai-aware datetime from 'Jun 30 (Tue)' + '3:56' (24h). None if untimed."""
+    if not date_label or not time_label:
+        return None
+    tl = time_label.strip()
+    if ":" not in tl:
+        return None                       # 'Ongoing', 'All week', blank
+    md = re.match(r"([A-Za-z]{3,})\s+(\d{1,2})", date_label)
+    if not md:
+        return None
+    mon = md.group(1)[:3].title()
+    if mon not in _MONTHS:
+        return None
+    month, day = _MONTHS.index(mon) + 1, int(md.group(2))
+    try:
+        hh, mm = (int(x) for x in tl.split(":")[:2])
+    except Exception:
+        return None
+    tz = ZoneInfo(TZNAME) if ZoneInfo else None
+    try:
+        d = _dt.datetime(now.year, month, day, hh, mm, tzinfo=tz)
+    except Exception:
+        return None
+    if (d - now).days < -180:             # year rollover (Dec sheet read in Jan)
+        try:
+            d = d.replace(year=now.year + 1)
+        except Exception:
+            pass
+    return d
+
+
+def get_calendar(now, force=False):
+    """Return cached {tab, astro[], econ[]}, refreshing from the sheet at most hourly."""
+    if (not force and _cal_cache["tab"]
+            and (time.time() - _cal_cache["ts"]) < CAL_REFRESH_SEC):
+        return _cal_cache
+    tab = TRACKER_TAB or _current_week_tab(now)
+    text = None
+    try:
+        text = _gviz_csv(sheet_name=tab)
+    except Exception:
+        try:
+            text = _gviz_csv(gid=0)       # fallback: first tab
+        except Exception:
+            text = None
+    if text is None:
+        return _cal_cache                 # keep whatever we had
+    rows = list(csv.reader(io.StringIO(text)))
+    astro, econ = _parse_events(text)
+    _cal_cache.update({"ts": time.time(), "tab": tab,
+                       "astro": astro, "econ": econ, "rows": rows})
+    return _cal_cache
+
+
+def tracker_context_text(now, max_chars=6000):
+    """Render the whole current-week tab as readable lines so the AI can answer any
+    question from it (snapshot, moon phases, planetary positions, transits, econ).
+    This is the bot's weekly 'database' — it follows whatever tab is current."""
+    cal = get_calendar(now)
+    rows = cal.get("rows") or []
+    if not rows:
+        return "(weekly tracker sheet not available right now)"
+    out = ["WEEKLY TRACKER TAB: %s" % (cal.get("tab") or "?")]
+    for r in rows:
+        cells = [(c or "").strip() for c in r]
+        while cells and cells[-1] == "":
+            cells.pop()
+        if not any(cells):
+            continue
+        out.append(" | ".join(cells))
+    txt = "\n".join(out)
+    if len(txt) > max_chars:
+        txt = txt[:max_chars] + "\n…(truncated)"
+    return txt
+
+
+def _fmt_astro(ev):
+    tail = " (%s)" % ev["meta"] if ev.get("meta") else ""
+    return "🔭 %s %s — %s%s" % (ev["date"], ev["time"], ev["title"], tail)
+
+
+def _fmt_econ(ev):
+    cur = (" [%s]" % ev["cur"]) if ev.get("cur") else ""
+    imp = (" %s" % ev["impact"]) if ev.get("impact") else ""
+    return "📅 %s %s — %s%s%s" % (ev["date"], ev["time"], ev["title"], cur, imp)
+
+
+def _fmt_event(ev):
+    return _fmt_astro(ev) if ev["kind"] == "astro" else _fmt_econ(ev)
+
+
+def _is_today(date_label, now):
+    m = re.match(r"([A-Za-z]{3,})\s+(\d{1,2})", date_label or "")
+    if not m:
+        return False
+    return m.group(1)[:3].title() == now.strftime("%b") and int(m.group(2)) == now.day
+
+
+def _time_key(ev):
+    tl = ev.get("time", "")
+    if ":" in tl:
+        try:
+            hh, mm = (int(x) for x in tl.split(":")[:2])
+            return hh * 60 + mm
+        except Exception:
+            pass
+    return 24 * 60 + 1                     # untimed -> sort last
+
+
+def daily_agenda_text(cal, now):
+    evs = [e for e in (cal["astro"] + cal["econ"]) if _is_today(e["date"], now)]
+    evs.sort(key=_time_key)
+    head = "🗓️ TODAY %s — Astro & Econ (Sec 3 & 4)" % now.strftime("%a %b %d")
+    if not evs:
+        return head + ":\n  (no timed transits or economic events today)"
+    return "\n".join([head + ":"] + ["  " + _fmt_event(e) for e in evs])
+
+
+def weekly_summary_text(cal, now):
+    lines = ["🗓️ WEEK AHEAD — %s (Dubai time)" % (cal.get("tab") or "this week"),
+             "", "🔭 SECTION 3 — Planetary transits:"]
+    lines += ["  " + _fmt_astro(e) for e in cal["astro"]] or ["  (none listed)"]
+    lines += ["", "📅 SECTION 4 — Economic calendar:"]
+    lines += ["  " + _fmt_econ(e) for e in cal["econ"]] or ["  (none listed)"]
+    return "\n".join(lines)
+
+
+def run_calendar_alerts(state, now, sent):
+    """Sheet-driven pings: 15-min-before each event, daily agenda, weekly summary."""
+    if not SHEET_ALERTS_ON:
+        return
+    cal = get_calendar(now)
+    today = now.strftime("%Y-%m-%d")
+
+    # Monday week-ahead summary (03:00 Dubai by default)
+    if now.weekday() == 0 and now.hour == CAL_WEEKLY_HOUR and _reminder_due(state, "cal_weekly"):
+        tg_send(weekly_summary_text(get_calendar(now, force=True), now))
+        sent.append("cal_weekly")
+
+    # Daily agenda (07:00 by default)
+    if now.hour == CAL_AGENDA_HOUR and _reminder_due(state, "cal_agenda"):
+        tg_send(daily_agenda_text(cal, now))
+        sent.append("cal_agenda")
+
+    # Heads-up before each timed event
+    for ev in (cal["astro"] + cal["econ"]):
+        d = _event_dt(ev.get("date"), ev.get("time"), now)
+        if not d:
+            continue
+        lead_min = (d - now).total_seconds() / 60.0
+        if 0 < lead_min <= CAL_LEAD_MIN:
+            key = "%s:evt:%s|%s|%s|%s" % (today, ev["kind"], ev["date"], ev["time"], ev["title"][:30])
+            if not state.get(key):
+                state[key] = True
+                tg_send("⏰ In ~%d min:\n%s" % (max(1, int(round(lead_min))), _fmt_event(ev)))
+                sent.append("cal_event")
 
 
 # --------------------------------------------------------------------------
@@ -815,6 +1095,12 @@ def run_tick():
 
     # ---- Live proactive alerts (movement / level / hourly / 4H) ----
     run_live_alerts(ctx, state, now, sent)
+
+    # ---- Weekly tracker sheet alerts (Section 3 transits + Section 4 econ) ----
+    try:
+        run_calendar_alerts(state, now, sent)
+    except Exception:
+        pass
 
     # 1) Weekly check-in — Sunday evening (Dubai week starts Sunday)
     if now.weekday() == 6 and hh >= 18 and _reminder_due(state, "weekly_checkin"):
