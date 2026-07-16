@@ -121,6 +121,14 @@ OHLC_PUSH_HOUR    = int(os.environ.get("OHLC_PUSH_HOUR", "7"))   # local hour to
 OHLC_CONTEXT_DAYS = int(os.environ.get("OHLC_CONTEXT_DAYS", "15"))
 OHLC_FILE         = os.path.join(DATA_DIR, "ohlc_history.json")
 
+# News RESULTS — when an economic event's ACTUAL prints, read gold impact (ForexFactory /
+# FairEconomy weekly JSON feed, same source app.py's news.py already uses).
+NEWS_FEED_URL   = os.environ.get("NEWS_FEED_URL", "https://nfs.faireconomy.media/ff_calendar_thisweek.json")
+NEWS_RESULTS_ON = os.environ.get("NEWS_RESULTS_ON", "1") not in ("0", "false", "False", "")
+NEWS_COUNTRIES  = set(x.strip() for x in os.environ.get("NEWS_COUNTRIES", "USD").split(",") if x.strip())
+NEWS_IMPACTS    = set(x.strip() for x in os.environ.get("NEWS_IMPACTS", "High,Medium").split(",") if x.strip())
+NEWS_REFRESH_SEC = int(os.environ.get("NEWS_REFRESH_SEC", "300"))
+
 TRACKER_SHEET_ID = os.environ.get("TRACKER_SHEET_ID", "13WdYpiBW9gJxJyN5mlq8oYM4M9XR0tMFz3ZFm9RXwjs")
 TRACKER_TAB      = os.environ.get("TRACKER_TAB", "").strip()   # blank = auto-detect current week
 SHEET_ALERTS_ON  = os.environ.get("SHEET_ALERTS_ON", "1") not in ("0", "false", "False", "")
@@ -486,8 +494,17 @@ def ask_ai(question, ctx, history, weekly):
     except Exception:
         ohlc_txt = ""
 
+    # Recent news results (actual vs forecast) from ForexFactory.
+    news_txt = ""
+    try:
+        nt = news_context_text(_now())
+        if nt:
+            news_txt = "\n\n=== " + nt
+    except Exception:
+        news_txt = ""
+
     sys = (SYSTEM_PROMPT + "\n\n=== LIVE SNAPSHOT ===\n" + snap
-           + weekly_txt + lessons_txt + trades_txt + tracker_txt + ohlc_txt)
+           + weekly_txt + lessons_txt + trades_txt + tracker_txt + ohlc_txt + news_txt)
 
     messages = []
     for turn in history[-MAX_HISTORY:]:
@@ -541,6 +558,7 @@ Commands:
   /events   today's Section 3 (transits) + Section 4 (economic) events
   /calendar the whole week ahead from your Gold & Astro Tracker sheet
   /ohlc     latest daily gold OHLC + last 7 days (saved in memory)
+  /news     this week's USD news: actual vs forecast + gold read
   /help     this message
 
 I also watch the market for you and push alerts on my own:
@@ -550,6 +568,8 @@ I also watch the market for you and push alerts on my own:
   🎯 a LEVEL alert the moment price reaches a support/resistance pivot
   ⏰ a heads-up ~%d min before every Section 3 transit & Section 4 econ event
   🗓️ a daily agenda each morning + a week-ahead summary every Monday
+  🗞️ a RESULT alert when a news actual prints (actual vs forecast → gold read)
+  📊 the daily gold OHLC each morning (saved in memory)
 (plus morning brief, London-NY overlap, news blackout & guardrail lock).""" % (
     int(ALERT_MOVE_USD), CAL_LEAD_MIN) + """
 
@@ -699,6 +719,9 @@ def handle_message(chat_id, text):
         return
     if low.startswith("/ohlc") or low.startswith("/daily"):
         tg_send(cmd_ohlc(_now()), chat_id)
+        return
+    if low.startswith("/news"):
+        tg_send(cmd_news(_now()), chat_id)
         return
 
     # Everything below needs live context
@@ -853,6 +876,157 @@ def cmd_ohlc(now):
         lines.append("%s  O %s H %s L %s C %s  (%s)" % (
             r.get("date"), r.get("open"), r.get("high"),
             r.get("low"), r.get("close"), r.get("dir")))
+    return "\n".join(lines)
+
+
+# --------------------------------------------------------------------------
+# News RESULTS — actual vs forecast -> gold impact (ForexFactory / FairEconomy feed)
+# --------------------------------------------------------------------------
+_news_cache = {"ts": 0.0, "events": []}
+
+
+def _fetch_news_feed():
+    nowt = time.time()
+    if _news_cache["events"] and (nowt - _news_cache["ts"]) < NEWS_REFRESH_SEC:
+        return _news_cache["events"]
+    data = _http_json(NEWS_FEED_URL, headers={"User-Agent": "Mozilla/5.0 (GoldOS bot)"}, timeout=15)
+    evs = data if isinstance(data, list) else []
+    _news_cache.update({"ts": nowt, "events": evs})
+    return evs
+
+
+def _news_num(s):
+    """Parse FF values like '3.2%', '250K', '-78.5B', '54.2' into a float (or None)."""
+    if s is None:
+        return None
+    t = str(s).strip().replace(",", "").replace("%", "").replace("$", "")
+    if t == "":
+        return None
+    mult = 1.0
+    if t[-1:] in "KkMmBbTt":
+        mult = {"k": 1e3, "m": 1e6, "b": 1e9, "t": 1e12}[t[-1].lower()]
+        t = t[:-1]
+    try:
+        return float(t) * mult
+    except Exception:
+        return None
+
+
+def _news_gold_read(title, actual, forecast, previous):
+    """Return (verdict, reason) for gold from an actual vs forecast surprise."""
+    a = _news_num(actual)
+    base = _news_num(forecast)
+    ref = "forecast"
+    if base is None:
+        base = _news_num(previous)
+        ref = "previous"
+    if a is None or base is None:
+        return ("", "")
+    t = (title or "").lower()
+    # Metrics where a HIGHER number means a WEAKER economy (so higher = bullish gold).
+    inverse = any(k in t for k in ("unemployment rate", "jobless", "unemployment claims",
+                                   "initial claims", "continuing claims"))
+    diff = a - base
+    scale = abs(base) if base else 1.0
+    if scale and abs(diff) / scale < 0.002:
+        return ("Neutral →", "Actual in line with %s (%s vs %s) — limited gold impact." % (ref, actual, forecast or previous))
+    stronger_usd = (diff > 0) != inverse       # stronger-than-expected USD data?
+    if stronger_usd:
+        return ("Bearish gold ↓",
+                "Stronger-than-expected USD data (actual %s vs %s %s) → firmer dollar, typically pressures gold." % (actual, ref, forecast or previous))
+    return ("Bullish gold ↑",
+            "Weaker-than-expected USD data (actual %s vs %s %s) → softer dollar, typically supports gold." % (actual, ref, forecast or previous))
+
+
+def _ev_dubai(ev):
+    ds = str(ev.get("date", ""))
+    try:
+        d = _dt.datetime.fromisoformat(ds)
+        if ZoneInfo:
+            d = d.astimezone(ZoneInfo(TZNAME))
+        return d
+    except Exception:
+        return None
+
+
+def run_news_alerts(state, now, sent):
+    """When a watched event's ACTUAL prints, send a gold-impact read (once per event)."""
+    if not NEWS_RESULTS_ON:
+        return
+    try:
+        events = _fetch_news_feed()
+    except Exception:
+        return
+    for ev in events:
+        if NEWS_COUNTRIES and ev.get("country") not in NEWS_COUNTRIES:
+            continue
+        if NEWS_IMPACTS and ev.get("impact") not in NEWS_IMPACTS:
+            continue
+        actual = ev.get("actual", "")
+        if actual in (None, ""):
+            continue                            # not released yet
+        date = str(ev.get("date", ""))[:10]
+        key = "live.newsres:%s|%s" % (date, ev.get("title", ""))
+        if state.get(key):
+            continue
+        state[key] = True
+        verdict, reason = _news_gold_read(ev.get("title", ""), actual,
+                                          ev.get("forecast", ""), ev.get("previous", ""))
+        msg = ("🗞️ RESULT — %s (%s)\nActual %s | Forecast %s | Prev %s" % (
+            ev.get("title"), ev.get("impact"), actual,
+            ev.get("forecast") or "—", ev.get("previous") or "—"))
+        if verdict:
+            msg += "\n→ %s %s" % (verdict, reason)
+        tg_send(msg)
+        sent.append("news_result")
+
+
+def cmd_news(now):
+    try:
+        events = _fetch_news_feed()
+    except Exception as e:
+        return "Couldn't fetch the news feed right now (%s)." % e
+    watch = [e for e in events
+             if (not NEWS_COUNTRIES or e.get("country") in NEWS_COUNTRIES)
+             and (not NEWS_IMPACTS or e.get("impact") in NEWS_IMPACTS)]
+    if not watch:
+        return "No USD High/Medium events in this week's calendar feed."
+    watch.sort(key=lambda e: str(e.get("date", "")))
+    out = ["🗞️ THIS WEEK — %s (%s), Dubai time:" % (
+        "/".join(sorted(NEWS_COUNTRIES)) or "all", "/".join(sorted(NEWS_IMPACTS)) or "all")]
+    for e in watch[:25]:
+        d = _ev_dubai(e)
+        when = d.strftime("%a %d %H:%M") if d else str(e.get("date", ""))[:16]
+        act = e.get("actual", "")
+        if act:
+            verdict, _ = _news_gold_read(e.get("title", ""), act, e.get("forecast", ""), e.get("previous", ""))
+            tag = "✅ %s (fc %s) %s" % (act, e.get("forecast") or "—", verdict)
+        else:
+            tag = "⏳ pending (fc %s)" % (e.get("forecast") or "—")
+        out.append("%s  %s [%s] — %s" % (when, e.get("title"), e.get("impact"), tag))
+    return "\n".join(out)
+
+
+def news_context_text(now, limit=8):
+    """Recent RELEASED results for the AI context."""
+    try:
+        events = _fetch_news_feed()
+    except Exception:
+        return ""
+    done = [e for e in events
+            if e.get("actual") not in (None, "")
+            and (not NEWS_COUNTRIES or e.get("country") in NEWS_COUNTRIES)
+            and (not NEWS_IMPACTS or e.get("impact") in NEWS_IMPACTS)]
+    if not done:
+        return ""
+    done.sort(key=lambda e: str(e.get("date", "")))
+    lines = ["RECENT NEWS RESULTS (actual vs forecast, ForexFactory):"]
+    for e in done[-limit:]:
+        verdict, _ = _news_gold_read(e.get("title", ""), e.get("actual", ""),
+                                     e.get("forecast", ""), e.get("previous", ""))
+        lines.append("%s: actual %s vs fc %s (prev %s) -> %s" % (
+            e.get("title"), e.get("actual"), e.get("forecast") or "—",
+            e.get("previous") or "—", verdict or "n/a"))
     return "\n".join(lines)
 
 
@@ -1199,10 +1373,17 @@ def run_tick():
     state = _load(REMINDER_FILE, {})
     if not isinstance(state, dict):
         state = {}
-    # prune old daily slots, but KEEP the persistent live.* tracking keys
+    # prune old daily slots, but KEEP the persistent live.* tracking keys.
+    # Also drop news-result markers older than 14 days so state doesn't grow forever.
     today = _now().strftime("%Y-%m-%d")
-    state = {k: v for k, v in state.items()
-             if k.startswith(today) or k.startswith("live.")}
+    _cutoff = (_now() - _dt.timedelta(days=14)).strftime("%Y-%m-%d")
+
+    def _keep(k):
+        if k.startswith("live.newsres:"):
+            d = k[len("live.newsres:"):][:10]
+            return d >= _cutoff
+        return k.startswith(today) or k.startswith("live.")
+    state = {k: v for k, v in state.items() if _keep(k)}
 
     now = _now()
     hh = now.hour
@@ -1233,6 +1414,12 @@ def run_tick():
                 sent.append("ohlc_daily")
         except Exception:
             pass
+
+    # ---- News RESULTS: alert with gold impact when an actual prints ----
+    try:
+        run_news_alerts(state, now, sent)
+    except Exception:
+        pass
 
     # 1) Weekly check-in — Sunday evening (Dubai week starts Sunday)
     if now.weekday() == 6 and hh >= 18 and _reminder_due(state, "weekly_checkin"):
