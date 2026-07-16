@@ -112,6 +112,15 @@ INTERNAL_TICK_SECONDS = max(60, int(os.environ.get("INTERNAL_TICK_SECONDS", "300
 # CSV method the dashboard already uses. Section 3 = planetary transits, Section 4 =
 # economic calendar. Fires a heads-up before each timed event, a daily agenda, and a
 # Monday week-ahead summary.
+# Daily OHLC memory — reads the "daily gold" tab of the price sheet and keeps a durable
+# record of each day's Open/High/Low/Close so the bot always "has" the daily candle.
+OHLC_SHEET_ID     = os.environ.get("OHLC_SHEET_ID", "12ynlr46bvHSJLnLGs5Z1SrhhlCj6_w7qO6YHMDBY7gs")
+OHLC_GID          = os.environ.get("OHLC_GID", "415704171")
+OHLC_ON           = os.environ.get("OHLC_ON", "1") not in ("0", "false", "False", "")
+OHLC_PUSH_HOUR    = int(os.environ.get("OHLC_PUSH_HOUR", "7"))   # local hour to save + send the daily OHLC
+OHLC_CONTEXT_DAYS = int(os.environ.get("OHLC_CONTEXT_DAYS", "15"))
+OHLC_FILE         = os.path.join(DATA_DIR, "ohlc_history.json")
+
 TRACKER_SHEET_ID = os.environ.get("TRACKER_SHEET_ID", "13WdYpiBW9gJxJyN5mlq8oYM4M9XR0tMFz3ZFm9RXwjs")
 TRACKER_TAB      = os.environ.get("TRACKER_TAB", "").strip()   # blank = auto-detect current week
 SHEET_ALERTS_ON  = os.environ.get("SHEET_ALERTS_ON", "1") not in ("0", "false", "False", "")
@@ -470,8 +479,15 @@ def ask_ai(question, ctx, history, weekly):
     except Exception:
         tracker_txt = ""
 
+    # Durable daily OHLC memory (the "daily gold" sheet).
+    ohlc_txt = ""
+    try:
+        ohlc_txt = "\n\n=== DAILY OHLC MEMORY ===\n" + ohlc_context_text(_now())
+    except Exception:
+        ohlc_txt = ""
+
     sys = (SYSTEM_PROMPT + "\n\n=== LIVE SNAPSHOT ===\n" + snap
-           + weekly_txt + lessons_txt + trades_txt + tracker_txt)
+           + weekly_txt + lessons_txt + trades_txt + tracker_txt + ohlc_txt)
 
     messages = []
     for turn in history[-MAX_HISTORY:]:
@@ -524,6 +540,7 @@ Commands:
   /lessons  show every standing rule you've taught me
   /events   today's Section 3 (transits) + Section 4 (economic) events
   /calendar the whole week ahead from your Gold & Astro Tracker sheet
+  /ohlc     latest daily gold OHLC + last 7 days (saved in memory)
   /help     this message
 
 I also watch the market for you and push alerts on my own:
@@ -680,6 +697,9 @@ def handle_message(chat_id, text):
     if low.startswith("/calendar") or low.startswith("/week-events") or low.startswith("/astro"):
         tg_send(weekly_summary_text(get_calendar(_now(), force=True), _now()), chat_id)
         return
+    if low.startswith("/ohlc") or low.startswith("/daily"):
+        tg_send(cmd_ohlc(_now()), chat_id)
+        return
 
     # Everything below needs live context
     ctx = fetch_context()
@@ -723,8 +743,9 @@ def _current_week_tab(now):
     return "Week %s-%s" % (fmt(monday), fmt(friday))
 
 
-def _gviz_csv(sheet_name=None, gid=None):
-    url = "https://docs.google.com/spreadsheets/d/%s/gviz/tq?tqx=out:csv" % TRACKER_SHEET_ID
+def _gviz_csv(sheet_name=None, gid=None, sheet_id=None):
+    sid = sheet_id or TRACKER_SHEET_ID
+    url = "https://docs.google.com/spreadsheets/d/%s/gviz/tq?tqx=out:csv" % sid
     if sheet_name:
         url += "&sheet=" + urllib.parse.quote(sheet_name)
     if gid is not None:
@@ -733,6 +754,106 @@ def _gviz_csv(sheet_name=None, gid=None):
     req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0 (GoldOS bot)"})
     with urllib.request.urlopen(req, timeout=20) as resp:
         return resp.read().decode("utf-8", "replace")
+
+
+# --------------------------------------------------------------------------
+# Daily OHLC memory (the "daily gold" tab)
+# --------------------------------------------------------------------------
+def _num(x):
+    try:
+        return round(float(str(x).replace(",", "").strip()), 2)
+    except Exception:
+        return None
+
+
+def _fetch_ohlc_rows():
+    """Pull the daily OHLC tab and parse to [{date,open,high,low,close,change,dir,vol}]."""
+    text = _gviz_csv(gid=OHLC_GID, sheet_id=OHLC_SHEET_ID)
+    rows = []
+    for r in csv.reader(io.StringIO(text)):
+        if not r:
+            continue
+        d = (r[0] or "").strip()
+        if not re.match(r"\d{4}-\d{2}-\d{2}", d):    # skip header / junk
+            continue
+        vol = ""
+        for cell in r:
+            if isinstance(cell, str) and cell.strip().endswith("%"):
+                vol = cell.strip()
+        rows.append({
+            "date": d[:10],
+            "open": _num(r[1]) if len(r) > 1 else None,
+            "high": _num(r[2]) if len(r) > 2 else None,
+            "low":  _num(r[3]) if len(r) > 3 else None,
+            "close": _num(r[4]) if len(r) > 4 else None,
+            "change": _num(r[6]) if len(r) > 6 else None,
+            "dir":  (r[7].strip() if len(r) > 7 else ""),
+            "vol":  vol,
+        })
+    rows.sort(key=lambda x: x["date"])
+    return rows
+
+
+def update_ohlc_memory(now):
+    """Refresh the durable OHLC history file from the sheet. Returns the row list."""
+    rows = _fetch_ohlc_rows()
+    if rows:
+        _save(OHLC_FILE, rows)          # the sheet is the full history -> this IS the memory
+    return rows
+
+
+def _latest_completed_ohlc(rows, now):
+    today = now.strftime("%Y-%m-%d")
+    past = [r for r in rows if r.get("date", "") <= today]
+    return past[-1] if past else (rows[-1] if rows else None)
+
+
+def _fmt_ohlc_day(r):
+    return ("📊 Daily Gold OHLC — %s\n"
+            "Open %s | High %s | Low %s | Close %s\n"
+            "Change %s (%s) | Vol %s" % (
+                r.get("date"), r.get("open"), r.get("high"), r.get("low"),
+                r.get("close"), r.get("change"), r.get("dir"), r.get("vol")))
+
+
+def ohlc_context_text(now, days=None):
+    """Compact recent-OHLC block for the AI, read from the durable memory file."""
+    rows = _load(OHLC_FILE, [])
+    if not rows:
+        try:
+            rows = update_ohlc_memory(now)
+        except Exception:
+            rows = []
+    if not rows:
+        return "(daily OHLC memory not available yet)"
+    days = days or OHLC_CONTEXT_DAYS
+    today = now.strftime("%Y-%m-%d")
+    past = [r for r in rows if r.get("date", "") <= today][-days:]
+    out = ["DAILY GOLD OHLC — last %d days (from your 'daily gold' sheet, saved in memory):" % len(past)]
+    for r in past:
+        out.append("%s  O %s H %s L %s C %s  chg %s (%s)  vol %s" % (
+            r.get("date"), r.get("open"), r.get("high"), r.get("low"),
+            r.get("close"), r.get("change"), r.get("dir"), r.get("vol")))
+    return "\n".join(out)
+
+
+def cmd_ohlc(now):
+    rows = _load(OHLC_FILE, [])
+    if not rows:
+        try:
+            rows = update_ohlc_memory(now)
+        except Exception as e:
+            return "Couldn't read the daily OHLC sheet right now (%s)." % e
+    last = _latest_completed_ohlc(rows, now)
+    if not last:
+        return "No daily OHLC rows found in the sheet yet."
+    tail = [r for r in rows if r.get("date", "") <= now.strftime("%Y-%m-%d")][-7:]
+    lines = [_fmt_ohlc_day(last), "", "Last 7 days:"]
+    for r in tail:
+        lines.append("%s  O %s H %s L %s C %s  (%s)" % (
+            r.get("date"), r.get("open"), r.get("high"),
+            r.get("low"), r.get("close"), r.get("dir")))
+    return "\n".join(lines)
 
 
 def _cell(r, i):
@@ -1101,6 +1222,17 @@ def run_tick():
         run_calendar_alerts(state, now, sent)
     except Exception:
         pass
+
+    # ---- Daily OHLC: save to memory + send once per day ----
+    if OHLC_ON and now.hour == OHLC_PUSH_HOUR and _reminder_due(state, "ohlc_daily"):
+        try:
+            rows = update_ohlc_memory(now)
+            r = _latest_completed_ohlc(rows, now)
+            if r:
+                tg_send(_fmt_ohlc_day(r) + "\n(saved to memory ✓)")
+                sent.append("ohlc_daily")
+        except Exception:
+            pass
 
     # 1) Weekly check-in — Sunday evening (Dubai week starts Sunday)
     if now.weekday() == 6 and hh >= 18 and _reminder_due(state, "weekly_checkin"):
