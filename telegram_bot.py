@@ -86,11 +86,11 @@ MAX_TOKENS = int(os.environ.get("BOT_MAX_TOKENS", "2000"))         # let answers
 # These make the bot push updates on its own. The tick can be pinged at any
 # frequency (UptimeRobot 5-min recommended); the logic is idempotent and only
 # sends when a real condition is met.
-ALERT_MOVE_USD    = float(os.environ.get("ALERT_MOVE_USD", "10"))   # $ move since last report that triggers a MOVE alert
-HEARTBEAT_EVERY_H = int(os.environ.get("HEARTBEAT_EVERY_H", "1"))   # send a heartbeat every N hours (1 = hourly, 0 = off)
+ALERT_MOVE_USD    = float(os.environ.get("ALERT_MOVE_USD", "30"))   # $ move since last report that triggers a MOVE alert (raised 10->30 to cut noise)
+HEARTBEAT_EVERY_H = int(os.environ.get("HEARTBEAT_EVERY_H", "0"))   # send a heartbeat every N hours (1 = hourly, 0 = off) — off by default to stop hourly spam
 LIVE_ALERTS_ON    = os.environ.get("LIVE_ALERTS_ON", "1") not in ("0", "false", "False", "")
-QUIET_START_H     = int(os.environ.get("QUIET_START_H", "-1"))      # optional quiet window start hour (local), -1 = off
-QUIET_END_H       = int(os.environ.get("QUIET_END_H", "-1"))        # optional quiet window end hour (local)
+QUIET_START_H     = int(os.environ.get("QUIET_START_H", "23"))      # quiet window start hour (local Dubai) — no live pushes 23:00->07:00
+QUIET_END_H       = int(os.environ.get("QUIET_END_H", "7"))         # quiet window end hour (local Dubai)
 
 # Gold's standard 4H candle closes are 01/05/09/13/17/21 GMT, which in Asia/Dubai (GMT+4)
 # = 05:00, 09:00, 13:00, 17:00, 21:00, 01:00 -> local hours 1,5,9,13,17,21. These are the
