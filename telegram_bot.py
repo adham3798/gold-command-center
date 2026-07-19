@@ -556,7 +556,7 @@ Commands:
   /learn ... teach me a standing rule I apply forever (e.g. /learn skip Asia session)
   /lessons  show every standing rule you've taught me
   /events   today's Section 3 (transits) + Section 4 (economic) events
-  /calendar the whole week ahead from your Gold & Astro Tracker sheet
+  /calendar this week's tracker (add "next" for next week: /calendar next)
   /ohlc     latest daily gold OHLC + last 7 days (saved in memory)
   /news     this week's USD news: actual vs forecast + gold read
   /help     this message
@@ -715,7 +715,9 @@ def handle_message(chat_id, text):
         tg_send(daily_agenda_text(get_calendar(_now(), force=True), _now()), chat_id)
         return
     if low.startswith("/calendar") or low.startswith("/week-events") or low.startswith("/astro"):
-        tg_send(weekly_summary_text(get_calendar(_now(), force=True), _now()), chat_id)
+        want_next = "next" in low
+        tab = _week_tab(_now(), 1) if want_next else None
+        tg_send(weekly_summary_text(get_calendar(_now(), force=True, tab=tab), _now()), chat_id)
         return
     if low.startswith("/ohlc") or low.startswith("/daily"):
         tg_send(cmd_ohlc(_now()), chat_id)
@@ -755,15 +757,19 @@ def handle_message(chat_id, text):
 # --------------------------------------------------------------------------
 # Gold & Astro Weekly Tracker — Section 3 (transits) & Section 4 (econ calendar)
 # --------------------------------------------------------------------------
-_cal_cache = {"ts": 0.0, "tab": None, "astro": [], "econ": [], "rows": []}
+_cal_cache = {}   # tab name -> {ts, tab, astro, econ, rows}
 
 
-def _current_week_tab(now):
-    """Tab name for the current week, matching the sheet's 'Week Jun29-Jul3' style."""
-    monday = now.date() - _dt.timedelta(days=now.weekday())
+def _week_tab(now, offset=0):
+    """Tab name for the current week (offset=0) or another week, 'Week Jun29-Jul3' style."""
+    monday = now.date() - _dt.timedelta(days=now.weekday()) + _dt.timedelta(days=7 * offset)
     friday = monday + _dt.timedelta(days=4)
     fmt = lambda d: "%s%d" % (d.strftime("%b"), d.day)
     return "Week %s-%s" % (fmt(monday), fmt(friday))
+
+
+def _current_week_tab(now):
+    return _week_tab(now, 0)
 
 
 def _gviz_csv(sheet_name=None, gid=None, sheet_id=None):
@@ -1095,37 +1101,36 @@ def _event_dt(date_label, time_label, now):
     return d
 
 
-def get_calendar(now, force=False):
-    """Return cached {tab, astro[], econ[]}, refreshing from the sheet at most hourly."""
-    if (not force and _cal_cache["tab"]
-            and (time.time() - _cal_cache["ts"]) < CAL_REFRESH_SEC):
-        return _cal_cache
-    tab = TRACKER_TAB or _current_week_tab(now)
+def get_calendar(now, force=False, tab=None):
+    """Return {tab, astro[], econ[], rows[]} for a week tab (default: current week),
+    cached per tab and refreshed from the sheet at most hourly."""
+    tab = tab or TRACKER_TAB or _current_week_tab(now)
+    cur = _cal_cache.get(tab)
+    if cur and not force and (time.time() - cur.get("ts", 0)) < CAL_REFRESH_SEC:
+        return cur
     text = None
     try:
         text = _gviz_csv(sheet_name=tab)
     except Exception:
+        text = None
+    if text is None and not _cal_cache:
         try:
-            text = _gviz_csv(gid=0)       # fallback: first tab
+            text = _gviz_csv(gid=0)       # very first load fallback: first tab
         except Exception:
             text = None
     if text is None:
-        return _cal_cache                 # keep whatever we had
+        return cur or {"ts": 0, "tab": tab, "astro": [], "econ": [], "rows": []}
     rows = list(csv.reader(io.StringIO(text)))
     astro, econ = _parse_events(text)
-    _cal_cache.update({"ts": time.time(), "tab": tab,
-                       "astro": astro, "econ": econ, "rows": rows})
-    return _cal_cache
+    entry = {"ts": time.time(), "tab": tab, "astro": astro, "econ": econ, "rows": rows}
+    _cal_cache[tab] = entry
+    return entry
 
 
-def tracker_context_text(now, max_chars=6000):
-    """Render the whole current-week tab as readable lines so the AI can answer any
-    question from it (snapshot, moon phases, planetary positions, transits, econ).
-    This is the bot's weekly 'database' — it follows whatever tab is current."""
-    cal = get_calendar(now)
+def _render_tab(cal, max_chars=6000):
     rows = cal.get("rows") or []
     if not rows:
-        return "(weekly tracker sheet not available right now)"
+        return ""
     out = ["WEEKLY TRACKER TAB: %s" % (cal.get("tab") or "?")]
     for r in rows:
         cells = [(c or "").strip() for c in r]
@@ -1138,6 +1143,20 @@ def tracker_context_text(now, max_chars=6000):
     if len(txt) > max_chars:
         txt = txt[:max_chars] + "\n…(truncated)"
     return txt
+
+
+def tracker_context_text(now, max_chars=6000):
+    """Render the current-week tab (and next week's tab when it exists) as readable lines
+    so the AI can answer any question from it — snapshot, moon phases, planetary positions,
+    transits, econ. Follows whatever tab is current and looks ahead to next week too."""
+    cur = _render_tab(get_calendar(now), max_chars=max_chars)
+    if not cur:
+        cur = "(current-week tracker sheet not available right now)"
+    nxt_cal = get_calendar(now, tab=_week_tab(now, 1))
+    nxt = _render_tab(nxt_cal, max_chars=3500)
+    if nxt:
+        return cur + "\n\n---- NEXT WEEK (%s) ----\n" % nxt_cal.get("tab") + nxt
+    return cur
 
 
 def _fmt_astro(ev):
