@@ -858,11 +858,14 @@ def _fmt_ohlc_day(r):
 def ohlc_context_text(now, days=None):
     """Compact recent-OHLC block for the AI, read from the durable memory file."""
     rows = _load(OHLC_FILE, [])
-    if not rows:
+    # Refresh if empty OR the saved data is stale (newest saved row older than 3 days).
+    newest = rows[-1].get("date", "") if rows else ""
+    stale = (not rows) or (newest < (now - _dt.timedelta(days=3)).strftime("%Y-%m-%d"))
+    if stale:
         try:
-            rows = update_ohlc_memory(now)
+            rows = update_ohlc_memory(now) or rows
         except Exception:
-            rows = []
+            pass
     if not rows:
         return "(daily OHLC memory not available yet)"
     days = days or OHLC_CONTEXT_DAYS
@@ -877,12 +880,14 @@ def ohlc_context_text(now, days=None):
 
 
 def cmd_ohlc(now):
-    rows = _load(OHLC_FILE, [])
+    # Always pull fresh from the sheet (also overwrites the stale saved memory); fall back
+    # to whatever is saved only if the live fetch fails.
+    try:
+        rows = update_ohlc_memory(now)
+    except Exception:
+        rows = _load(OHLC_FILE, [])
     if not rows:
-        try:
-            rows = update_ohlc_memory(now)
-        except Exception as e:
-            return "Couldn't read the daily OHLC sheet right now (%s)." % e
+        return "Couldn't read the daily OHLC sheet right now."
     last = _latest_completed_ohlc(rows, now)
     if not last:
         return "No daily OHLC rows found in the sheet yet."
