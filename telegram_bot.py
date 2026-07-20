@@ -115,7 +115,8 @@ INTERNAL_TICK_SECONDS = max(60, int(os.environ.get("INTERNAL_TICK_SECONDS", "300
 # Daily OHLC memory — reads the "daily gold" tab of the price sheet and keeps a durable
 # record of each day's Open/High/Low/Close so the bot always "has" the daily candle.
 OHLC_SHEET_ID     = os.environ.get("OHLC_SHEET_ID", "12ynlr46bvHSJLnLGs5Z1SrhhlCj6_w7qO6YHMDBY7gs")
-OHLC_GID          = os.environ.get("OHLC_GID", "415704171")
+OHLC_TAB          = os.environ.get("OHLC_TAB", "gold_price")   # the tab app.py keeps CURRENT
+OHLC_GID          = os.environ.get("OHLC_GID", "415704171")    # legacy "daily gold" tab (stale) — fallback only
 OHLC_ON           = os.environ.get("OHLC_ON", "1") not in ("0", "false", "False", "")
 OHLC_PUSH_HOUR    = int(os.environ.get("OHLC_PUSH_HOUR", "7"))   # local hour to save + send the daily OHLC
 OHLC_CONTEXT_DAYS = int(os.environ.get("OHLC_CONTEXT_DAYS", "15"))
@@ -761,8 +762,12 @@ _cal_cache = {}   # tab name -> {ts, tab, astro, econ, rows}
 
 
 def _week_tab(now, offset=0):
-    """Tab name for the current week (offset=0) or another week, 'Week Jun29-Jul3' style."""
-    monday = now.date() - _dt.timedelta(days=now.weekday()) + _dt.timedelta(days=7 * offset)
+    """Tab name for the current trading week (offset=0) or another week, 'Week Jun29-Jul3'
+    style. Sat/Sun roll forward to the UPCOMING week — the gold week opens Sunday night, so
+    on the weekend the bot should already be on the new Mon–Fri tab."""
+    wd = now.weekday()                       # Mon=0 .. Sun=6
+    shift = (7 - wd) if wd >= 5 else -wd      # Sat/Sun -> next Monday; weekdays -> this Monday
+    monday = now.date() + _dt.timedelta(days=shift) + _dt.timedelta(days=7 * offset)
     friday = monday + _dt.timedelta(days=4)
     fmt = lambda d: "%s%d" % (d.strftime("%b"), d.day)
     return "Week %s-%s" % (fmt(monday), fmt(friday))
@@ -796,8 +801,13 @@ def _num(x):
 
 
 def _fetch_ohlc_rows():
-    """Pull the daily OHLC tab and parse to [{date,open,high,low,close,change,dir,vol}]."""
-    text = _gviz_csv(gid=OHLC_GID, sheet_id=OHLC_SHEET_ID)
+    """Pull the daily OHLC tab and parse to [{date,open,high,low,close,change,dir,vol}].
+    Reads the CURRENT 'gold_price' tab (the one app.py keeps live); falls back to the older
+    'daily gold' gid only if that fails."""
+    try:
+        text = _gviz_csv(sheet_name=OHLC_TAB, sheet_id=OHLC_SHEET_ID)
+    except Exception:
+        text = _gviz_csv(gid=OHLC_GID, sheet_id=OHLC_SHEET_ID)
     rows = []
     for r in csv.reader(io.StringIO(text)):
         if not r:
